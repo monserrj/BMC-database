@@ -1,13 +1,12 @@
 # README.md `docs`
 
-This folder is intended to hold _documentation_ for your repository and project. "Documentation" can cover many things, including:
+This folder is intended to hold _documentation_ for my database repository and project. "Documentation" contents include or will include:
 
-- A detailed account (or accounts) of your project's analysis workflow
+- A training folder from the sqlite carpentry course with Python examples
+- A detailed account (or accounts) of your project's analysis workflow (to be developed)
   - essentially, this would be an online Methods section for your work
-- Manuals and other guides for any software you write
-- Papers relevant to the work being done
 
-## Good practice
+## Good practice information to always have into account
 
 - It is useful to keep the different kinds of documentation in different subfolders, to help you navigate the project files
 - Documentation file should be clearly named, so you don't have to open them to know the general contents; this will help you find relevant information again later in the project
