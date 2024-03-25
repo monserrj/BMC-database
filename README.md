@@ -1,7 +1,6 @@
 # README.md `BMC database`
-What is the project
-Why this exist
-How to use it
+
+Space designed to create the Bacterial microcompartment database. This database is being designed with the objective of facilitating access to BMC protein information for research purposes. Proteins include both structural proteins (e.g.: hexamers) and proteins with other functions that are part of the bacterial microcompartment, such as a chaperone or signature enzyme
 
 ## TABLE OF CONTENTS
 - .github : useful github instructions
