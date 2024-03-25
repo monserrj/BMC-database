@@ -1,5 +1,11 @@
 # README.md `scripts`
 
-This folder might contain the code you write to conduct your analysis or workflow.
+This folder contains the code being developed for the BMC database project. Including:
 
-There are many ways to organise a folder like this, for example by analysis type, or by the kind of data being analysed by the script.
+    A .sql file with the code to create the database skeleton (without no content information)
+    A .txt file with the BMC dump file of the skeleton of the database
+    
+    A .sql file with the to work on with manually by adding information to the database and interrogate it
+    A .txt file with the latest BMC dump file of the above database
+    
+Visual studio for modifications and wsl with sqlite3 will be used to create, modify and interrogate these databases
