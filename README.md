@@ -4,12 +4,12 @@ Why this exist
 How to use it
 
 ## TABLE OF CONTENTS
-- .github
-- assets
-- data
+- .github : useful github instructions
+- assets : miscellaneous documents for different purposes not directly related to database development
+- data : Data generated (raw or cleaned) or downloaded for database development
 - docs : Important documents such as methods or training material
-- notebooks
-- results
+- notebooks : Not used yet
+- results : ouputs obtained from database development
 - scripts : code in development to create database
 - .gitignore
 - _config.yml
