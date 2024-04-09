@@ -1,5 +1,5 @@
-.mode column
 .header on
+.mode COLUMN
 
 CREATE TABLE Protein (
     prot_ID integer,
@@ -13,7 +13,7 @@ CREATE TABLE Protein (
 CREATE TABLE Gene (
     gene_name integer,
     gene_ID integer,
-    dna_seq integer, -- If I have the DNA seq here I am duplicating info
+    dna_seq integer,-- If I have the DNA seq here I am duplicating info
     primary key(gene_ID)
 );
 
@@ -103,14 +103,14 @@ CREATE TABLE Function_GO (
     -- MF (molecular function), CC (cellular compartment), or BP (biological process)
     go_description varchar,
     -- text description of the function
-    primary key(goID)
+    primary key(go_ID)
 );
 
 CREATE TABLE Protein_GO (
     go_ID integer,
     prot_ID integer,
     foreign key(go_ID) references Function_GO(go_ID),
-    foreign key(prot_ID) references Protein(prot_ID),
+    foreign key(prot_ID) references Protein(prot_ID)
 );
 
 CREATE TABLE Enzyme_path (
@@ -124,8 +124,8 @@ CREATE TABLE Protein_path (
     path_ID integer,
     prot_ID integer,
     foreign key(path_ID) references Enzyme_path(path_ID),
-    foreign key(prot_ID) references Protein(prot_ID),
-)
+    foreign key(prot_ID) references Protein(prot_ID)
+);
 
 CREATE TABLE Complex (
     complex_ID integer,
@@ -140,66 +140,67 @@ CREATE TABLE Complex (
     complex_source integer,
     -- Native complex, experimental complex, theorical complex
     primary key(complex_ID)
-); -- Should I add classification for native complext?
+);-- Should I add classification for native complext?
 
 CREATE TABLE Protein_complex(
     complex_ID integer,
     -- Several proteins can belong to the same complex and one protein to several complexes
     prot_ID integer,
     prot_essential_assembly integer, -- is this protein essential for the assembly of the complex (Y/N)?
-    prot_interact_ID integer -- (ask Leighton, is about direct interation not complex)
+    prot_interact_ID integer, -- ask Leighton, is about direct interation not complex
     copy_number integer, -- protein copy number in complex (stecheometry)
-    -- structural_prot_type integer, -- move to protein table to avoid redundances
+     -- structural_prot_type integer, -- move to protein table to avoid redundances
     foreign key(complex_ID) references Complex(complex_ID),
     foreign key(prot_ID) references Protein(prot_ID),
     foreign key(prot_interact_ID) references Protein(prot_ID)
 );
+
 -- DATA INTRODUCTION:
 
 -- Protein table:
-INSERT INTO Protein(protID, prot_seq, locus_NCBI_ID, uniprot_ID, structural_prot_type) VALUES (1,
+INSERT INTO Protein(prot_ID, prot_seq, locus_NCBI_ID, uniprot_ID, structural_prot_type) VALUES (1,
 "MHLARVTGVVVSTQKSPSLVGKKLLLVRRVSADGELPASPVSGDEVAVDSVGAGTGELVLLSSGSSARHVFSGPNEAIDLAIVGIVDTLSR",
 "JMV71_RS09440",
 "P0DUV6", "BMC-P"
 );
 
-INSERT INTO Protein(protID, prot_seq, locus_NCBI_ID, uniprot_ID, structural_prot_type) VALUES (2,
+INSERT INTO Protein(prot_ID, prot_seq, locus_NCBI_ID, uniprot_ID, structural_prot_type) VALUES (2,
 "MADALGMIEVRGFVGMVEAADAMVKAAKVELIGYEKTGGGYVTAVVRGDVAAVKAATEAGQRAAERVGEVVAVHVIPRPHVNVDAALPLGRTPGMDKSA",
 "HOCH_RS28905",
 "D0LID5", "BMC-H"
 );
 
-INSERT INTO Protein(protID, prot_seq, locus_NCBI_ID, uniprot_ID, structural_prot_type) VALUES (3,
+INSERT INTO Protein(prot_ID, prot_seq, locus_NCBI_ID, uniprot_ID, structural_prot_type) VALUES (3,
 "MNTSELETLIRNILSEQLAPAKAEVKGNGIFPSVSEAIDAAHQAFLRYQQCPLKTRSAIINALREELTPHLASLAAESAAETGMGNKEDKFLKNKAALDNTPGIEDLTTTALTGDGGMVLFEYSPFGVIGSVAPSTNPTETIINNSISMLAAGNSVYFSPHPGAKAVSLKLITMIEDIAFRCCGIRNLVVTVTEPTFEATQQMMAHPKIAVLAITGGPGIVAMGMKSGKKVIGAGAGNPPCIVDETADLVKAAEDIINGASFDFNLPCIAEKSLIVVDAVAERLVQQMQSFGAMRLNSEEIDKLRAVCLPEGIANKQLVGKSPATLLEAAGIPVPAKAPRLLIGIVKADDPWVTSEQLMPMLPIVTVSDFDSALTLALKVEEGLHHTAIMHSQNVSRLNLAARTLQTSIFVKNGPSYAGIGVGGEGFTTFTIATPTGEGTTSARTFARSRRCVLTNGFSIR",
 "JMV71_RS09430",
 "B1VB75", null
 );
 
-INSERT INTO Protein(protID, prot_seq, locus_NCBI_ID, uniprot_ID, structural_prot_type) VALUES (4,
+INSERT INTO Protein(prot_ID, prot_seq, locus_NCBI_ID, uniprot_ID, structural_prot_type) VALUES (4,
 "MAHDEQLWLTPRLQKAAALCNQTPAASDTPLWLGVDLGTCDVVSMVVDGNAQPVAVCLDWADVVRDGIVWDFFGAVTLVRRHLDTLEQQLGCRFTHAATSFPPGTDPRISINVLESAGLEVSHVLDEPTAVADLLALDNAGVVDIGGGTTGIAIVKQGKVTYSADEATGGHHISLTLAGNRRIPLEEAEQYKRSNAQEIWPVVKPVYEKMAEIVARHIEGQGIADLWLAGGSCMQPGVEALFRQRFPELQVHLPQHSLFMTPLAIANSGRAKAEGLYAS",
 "STM2462",
 "P0A206", null
 );
 
-INSERT INTO Protein(protID, prot_seq, locus_NCBI_ID, uniprot_ID, structural_prot_type) VALUES (5,
+INSERT INTO Protein(prot_ID, prot_seq, locus_NCBI_ID, uniprot_ID, structural_prot_type) VALUES (5,
 "MPALDLIRPSVTAMRVIASVNDGFARELKLPPHIRSLGLITADSDDVTYIAADEATKQAMVEVVYGRSLYAGAAHGPSPTAGEVLIMLGGPNPAEVRAGLDAMVASIENGAAFQWANDAENTAFLAHVVSRTGSYLSSTAGIALGDPMAYLVAPPLEATFGIDAAMKSADVQLVTYVPPPSETNYSAAFLTGSQAACKACNAFTDAVLDIARNPVQRA",
 "STM2456",
 "P0A1C9", "BMC-T"
 );
 
-INSERT INTO Protein(protID, prot_seq, locus_NCBI_ID, uniprot_ID, structural_prot_type) VALUES (6,
+INSERT INTO Protein(prot_ID, prot_seq, locus_NCBI_ID, uniprot_ID, structural_prot_type) VALUES (6,
 "MQQEALGMVETKGLTAAIEAADAMVKSANVMLVGYEKIGSGLVTVIVRGDVGAVKAATDAGAAAARNVGEVKAVHVIPRPHTDVEKILPKGIS",
 "QRZ63_RS08710",
 "P0DUM6", "BMC-H"
 );
 
-INSERT INTO Protein(protID, prot_seq, locus_NCBI_ID, uniprot_ID, structural_prot_type) VALUES (7,
+INSERT INTO Protein(prot_ID, prot_seq, locus_NCBI_ID, uniprot_ID, structural_prot_type) VALUES (7,
 "MSSNELVDQIMAQVIARVATPEQQAIPENNPPTRETAMAEKSCSLTEFVGTAIGDTVGLVIANVDSALLDAMKLEKRYRSIGILGARTGAGPHIMAADEAVKATNTEVVSIELPRDTKGGAGHGSLIILGGNDVSDVKRGIEVALKELDRTFGDVYANEAGHIEMQYTARASYALEKAFGAPIGRACGVIVGAPASVGVLMADTALKSANVEVVAYSSPAHGTSFSNEAILVISGDSGAVRQAVISAREIGKTVLGTLGSEPKNDRPSYI",
 null,
 "B1VB63",  "BMC-T"-- cannot find locus ID
 );
 
-INSERT INTO Protein(protID, prot_seq, locus_NCBI_ID, uniprot_ID, structural_prot_type) VALUES (8,
+INSERT INTO Protein(prot_ID, prot_seq, locus_NCBI_ID, uniprot_ID, structural_prot_type) VALUES (8,
 "MAEKSCSLTEFVGTAIGDTVGLVIANVDSALLDAMKLEKRYRSIGILGARTGAGPHIMAADEAVKATNTEVVSIELPRDTKGGAGHGSLIILGGNDVSDVKRGIEVALKELDRTFGDVYANEAGHIEMQYTARASYALEKAFGAPIGRACGVIVGAPASVGVLMADTALKSANVEVVAYSSPAHGTSFSNEAILVISGDSGAVRQAVISAREIGKTVLGTLGSEPKNDRPSYI",
 null,
 "B1VB63-2", "BMC-T" -- cannot find locus ID

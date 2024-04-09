@@ -103,14 +103,14 @@ CREATE TABLE Function_GO (
     -- MF (molecular function), CC (cellular compartment), or BP (biological process)
     go_description varchar,
     -- text description of the function
-    primary key(goID)
+    primary key(go_ID)
 );
 
 CREATE TABLE Protein_GO (
     go_ID integer,
     prot_ID integer,
     foreign key(go_ID) references Function_GO(go_ID),
-    foreign key(prot_ID) references Protein(prot_ID),
+    foreign key(prot_ID) references Protein(prot_ID)
 );
 
 CREATE TABLE Enzyme_path (
@@ -124,8 +124,8 @@ CREATE TABLE Protein_path (
     path_ID integer,
     prot_ID integer,
     foreign key(path_ID) references Enzyme_path(path_ID),
-    foreign key(prot_ID) references Protein(prot_ID),
-)
+    foreign key(prot_ID) references Protein(prot_ID)
+);
 
 CREATE TABLE Complex (
     complex_ID integer,
@@ -147,7 +147,7 @@ CREATE TABLE Protein_complex(
     -- Several proteins can belong to the same complex and one protein to several complexes
     prot_ID integer,
     prot_essential_assembly integer, -- is this protein essential for the assembly of the complex (Y/N)?
-    prot_interact_ID integer (ask Leighton, is about direct interation not complex)
+    prot_interact_ID integer, -- ask Leighton, is about direct interation not complex
     copy_number integer, -- protein copy number in complex (stecheometry)
      -- structural_prot_type integer, -- move to protein table to avoid redundances
     foreign key(complex_ID) references Complex(complex_ID),
