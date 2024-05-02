@@ -130,8 +130,8 @@ class Gene(Base):
 
     __tablename__ = "gene"
     
-    gene_id = Column(Integer, primary_key=True)  # primary key column
-    gene_name = Column(Integer, nullable=False)
+    gen_id = Column(Integer, primary_key=True)  # primary key column
+    gen_name = Column(Integer, nullable=False)
     dna_seq = Column(String, nullable=False)
 
   # Define relationships after defining columns
@@ -150,7 +150,7 @@ class Taxon(Base):
     tax_id = Column(Integer, primary_key=True)  # primary key column
     tax_ref = Column(VARCHAR, unique=True, nullable=False) # accession number in db
     tax_db = Column(String, nullable=False) # Name of database used (e.g.: NCBI, GTDB)
-    specie = Column(String, nullable=False)
+    species = Column(String, nullable=False)
     genus = Column(String)
     family = Column(String)
     order_tax = Column(String)
@@ -256,4 +256,8 @@ class Enzyme_path(Base):
 # A many-to-many relationship between Protein and enzymatic activity
     proteincomplex = relationship("complex", secondary=proteincomplex)
 # To enforce unique no repeated complexes are created
-    __table_args__ = (UniqueConstraint("complex_id", "complex_type", "complex_activity", "assembly_exp_tested", "complex_source"))  
+    __table_args__ = (UniqueConstraint("complex_id", "complex_type", "complex_activity", "assembly_exp_tested", "complex_source"))
+
+# Now that we have defined the tables, we can create the tables in the
+# database.
+Base.metadata.create_all(engine)
