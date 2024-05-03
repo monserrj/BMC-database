@@ -1,0 +1,15 @@
+﻿prot_id,complex_id,prot_essential_assembly,interact_prot_ID,copy_number
+1,1,Y,6,unknown
+1,4,y,6,unknown
+1,5,y,6,unknown
+3,1,n,6,unknown
+2,2,y,unknown,unknown
+2,7,unknown,unknown,unknown
+4,3,n,unknown,unknown
+5,3,n,unknown,unknown
+5,6,n,unknown,unknown
+6,1,n,"[7,8,1]",unknown
+6,4,n,"[7,8,1]",unknown
+6,5,n,"[7,8,1]",unknown
+7,1,y,6,unknown
+7,4,y,6,unknown
