@@ -1,13 +1,21 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 
-# This script is the development of the BMC db following the 
+# This script is the development of the BMC db following the
 # BMC-database-skeleton.sql file. Instructions from create_Db.py file
 # followed and explanations needed kept to help following through
 
 # Import  SQLAlchemy classes needed with a declarative approach.
 
 from sqlalchemy.orm import declarative_base
-from sqlalchemy import Column, Integer, String, Table, ForeignKey, UniqueConstraint, VARCHAR
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Table,
+    ForeignKey,
+    UniqueConstraint,
+    #    VARCHAR,
+)
 from sqlalchemy.orm import relationship, backref
 
 # Create_engine function to create an engine object
@@ -39,20 +47,20 @@ proteingene = Table(
     Base.metadata,
     Column("prot_id", Integer, ForeignKey("protein.prot_id")),
     Column("gen_id", Integer, ForeignKey("gene.gen_id")),
-    Column("name_rank", Integer), 
+    Column("name_rank", Integer),
     # To enforce unique combinations of protein, gene ID and rank
     # to ensure several names from a protein/gene are
     # not made principal
-    __table_args__ = (UniqueConstraint("prot_id", "gene_id", "name_rank"))
+    __table_args__=(UniqueConstraint("prot_id", "gen_id", "name_rank")),
 )
 
 proteintaxon = Table(
     "protein_taxon",
     Base.metadata,
     Column("prot_id", Integer, ForeignKey("protein.prot_id")),
-    Column ("tax_id", Integer, ForeignKey("taxon.tax_id")),
-)            
-            
+    Column("tax_id", Integer, ForeignKey("taxon.tax_id")),
+)
+
 proteinpdb = Table(
     "protein_pdb",
     Base.metadata,
@@ -117,10 +125,11 @@ class Protein(Base):
 
     prot_id = Column(Integer, primary_key=True)  # primary key column
     prot_seq = Column(String, nullable=False, unique=True)  # sequence string
-    locus_NCBI_ID = Column(VARCHAR)
-    uniprot_ID = Column (VARCHAR)
-    struct_prot_type = Column (Integer, nullable = True)
-  
+    locus_NCBI_ID = Column(String)
+    uniprot_ID = Column(String)
+    struct_prot_type = Column(Integer, nullable=True)
+
+
 class Gene(Base):
     """Table representing a gene name and DNA sequence
 
@@ -129,14 +138,15 @@ class Gene(Base):
     """
 
     __tablename__ = "gene"
-    
+
     gen_id = Column(Integer, primary_key=True)  # primary key column
     gen_name = Column(Integer, nullable=False)
     dna_seq = Column(String, nullable=False)
 
-  # Define relationships after defining columns
+    # Define relationships after defining columns
     # A one-to-many relationship between Protein and Gene
     protein_gene = relationship("gene", secondary=proteingene)
+
 
 class Taxon(Base):
     """Table representing the taxon accession of a protein
@@ -148,22 +158,23 @@ class Taxon(Base):
 
     __tablename__ = "taxon"
     tax_id = Column(Integer, primary_key=True)  # primary key column
-    tax_ref = Column(VARCHAR, unique=True, nullable=False) # accession number in db
-    tax_db = Column(String, nullable=False) # Name of database used (e.g.: NCBI, GTDB)
+    tax_ref = Column(String, unique=True, nullable=False)  # accession number in db
+    tax_db = Column(String, nullable=False)  # Name of database used (e.g.: NCBI, GTDB)
     species = Column(String, nullable=False)
     genus = Column(String)
     family = Column(String)
     order_tax = Column(String)
     phylum = Column(String)
     class_tax = Column(String)
-    strain = Column(String) 
+    strain = Column(String)
 
-# A many-to-one relationship between Protein and Taxonomy
+    # A many-to-one relationship between Protein and Taxonomy
     protein_taxon = relationship("taxon", secondary=proteintaxon)
 
-# To enforce unique taxon references
-    __table_args__ = (UniqueConstraint("tax_id", "tax_ref"))
-        
+    # To enforce unique taxon references
+    __table_args__ = UniqueConstraint("tax_id", "tax_ref")
+
+
 class Pdb(Base):
     """Table representing the Pdb accession of a protein
 
@@ -173,13 +184,14 @@ class Pdb(Base):
 
     __tablename__ = "pdb"
     pdb_id = Column(Integer, primary_key=True)  # primary key column
-    pdb_acc_1 = Column(VARCHAR, unique=True) # primary accession number in pdb
-    pdb_acc_2 = Column(VARCHAR, nullable=False) # accession number
-    pdb_acc_3 = Column(VARCHAR, nullable=False) # accession number 
+    pdb_acc_1 = Column(String, unique=True)  # primary accession number in pdb
+    pdb_acc_2 = Column(String, nullable=False)  # accession number
+    pdb_acc_3 = Column(String, nullable=False)  # accession number
 
-# A one-to-many relationship between Protein and Pdb structure
-    protein_pdb = relationship("pdb", secondary=proteinpdb)  
-    
+    # A one-to-many relationship between Protein and Pdb structure
+    protein_pdb = relationship("pdb", secondary=proteinpdb)
+
+
 class Domain(Base):
     """Table representing the conserved domain family of a protein
 
@@ -190,14 +202,17 @@ class Domain(Base):
 
     __tablename__ = "domain"
     dom_id = Column(Integer, primary_key=True)  # primary key column
-    dom_ref = Column(VARCHAR, unique=True, nullable=False) # domain accession in external db
-    dom_db = Column(Integer, nullable=False) # external database name e.g. pfam, CDD
+    dom_ref = Column(
+        String, unique=True, nullable=False
+    )  # domain accession in external db
+    dom_db = Column(Integer, nullable=False)  # external database name e.g. pfam, CDD
 
-# A many-to-many relationship between Protein and domain family
-    protein_domain = relationship("domain", secondary=proteindomain)  
-# To enforce unique domain family references
-    __table_args__ = (UniqueConstraint("dom_id", "dom_ref"))
-    
+    # A many-to-many relationship between Protein and domain family
+    protein_domain = relationship("domain", secondary=proteindomain)
+    # To enforce unique domain family references
+    __table_args__ = UniqueConstraint("dom_id", "dom_ref")
+
+
 class Function(Base):
     """Table representing a function of a protein
 
@@ -209,15 +224,16 @@ class Function(Base):
 
     __tablename__ = "Function"
     go_id = Column(Integer, primary_key=True)  # primary key column
-    go_ref = Column(VARCHAR, unique=True, nullable=False) # accession number in GO
-    go_type = Column(String, nullable=False) # GO type (MF,CC,BP)
-    go_description = Column(String, nullable=False) # text description of function
+    go_ref = Column(String, unique=True, nullable=False)  # accession number in GO
+    go_type = Column(String, nullable=False)  # GO type (MF,CC,BP)
+    go_description = Column(String, nullable=False)  # text description of function
 
-# A many-to-many relationship between Protein and function
-    protein_GO = relationship("function", secondary=proteinGO)  
-# To enforce unique function references
-    __table_args__ = (UniqueConstraint("go_id", "go_ref"))
-    
+    # A many-to-many relationship between Protein and function
+    protein_GO = relationship("function", secondary=proteinGO)
+    # To enforce unique function references
+    __table_args__ = UniqueConstraint("go_id", "go_ref")
+
+
 class Enzyme_path(Base):
     """Table representing the enzymatic reaction in which the protein
     participates
@@ -229,14 +245,15 @@ class Enzyme_path(Base):
 
     __tablename__ = "enzyme_path"
     path_id = Column(Integer, primary_key=True)  # primary key column
-    KO_ref = Column(VARCHAR, unique=True, nullable=False) # accession number in KO
+    KO_ref = Column(String, unique=True, nullable=False)  # accession number in KO
 
-# A many-to-many relationship between Protein and enzymatic activity
-    proteinpath = relationship("enzyme_path", secondary=proteinpath)  
-# To enforce unique enzymatic pathway references
-    __table_args__ = (UniqueConstraint("path_id", "KO_ref"))
-    
- class Complex(Base):
+    # A many-to-many relationship between Protein and enzymatic activity
+    proteinpath = relationship("enzyme_path", secondary=proteinpath)
+    # To enforce unique enzymatic pathway references
+    __table_args__ = UniqueConstraint("path_id", "KO_ref")
+
+
+class Complex(Base):
     """Table representing the complex that can be form by the interaction
     between several proteins, including native BMC or engineered ones
 
@@ -248,16 +265,22 @@ class Enzyme_path(Base):
 
     __tablename__ = "complex"
     complex_id = Column(Integer, primary_key=True)  # primary key column
-    complex_type = Column(String) # Classification undecided (pdueut,grm..)
-    complex_activity = Column(String, nullable=False) # Active/Inactive
-    assembly_exp_tested = Column(String, nullable=False) #Y/N. If Y reference paper?
-    complex_source = Column(String, nullable=False) #Native/engineered/theoretical...
+    complex_type = Column(String)  # Classification undecided (pdueut,grm..)
+    complex_activity = Column(String, nullable=False)  # Active/Inactive
+    assembly_exp_tested = Column(String, nullable=False)  # Y/N. If Y reference paper?
+    complex_source = Column(String, nullable=False)  # Native/engineered/theoretical...
 
-# A many-to-many relationship between Protein and enzymatic activity
+    # A many-to-many relationship between Protein and enzymatic activity
     proteincomplex = relationship("complex", secondary=proteincomplex)
-# To enforce unique no repeated complexes are created
-    __table_args__ = (UniqueConstraint("complex_id", "complex_type", "complex_activity", "assembly_exp_tested", "complex_source"))
-    
+    # To enforce unique no repeated complexes are created
+    __table_args__ = UniqueConstraint(
+        "complex_id",
+        "complex_type",
+        "complex_activity",
+        "assembly_exp_tested",
+        "complex_source",
+    )
+
 
 # Now that we have defined the tables, we can create the tables in the
 # database.
@@ -274,9 +297,9 @@ import csv
 
 # Open the csv files
 # Open the CSV file
-csv_file_path = 'prot_info.csv'  # Update with your file path
+csv_file_path = "prot_info.csv"  # Update with your file path
 mydata = []
-with open(csv_file_path, newline='') as csvfile:
+with open(csv_file_path, newline="") as csvfile:
     reader = csv.reader(csvfile)
     next(reader)  # Skip header row
     for row in reader:
@@ -291,10 +314,33 @@ session = Session()
 # We need to check if the sequence, structure, and accession already exist,
 # and update the corresponding tables accordingly if they do not.
 # We can then update the linker tables by adding the corresponding items.
-for (prot, protseq, NCBIid, uniprot, struct, gen, name, dnaseq, 
-     tax, taxref, taxdb, species, genus, family, order, phylum, 
-     classt, strain, pdb, pdb_1, pdb_2, pdb_3, path, KO) in mydata:
-    
+for (
+    prot,
+    protseq,
+    NCBIid,
+    uniprot,
+    struct,
+    gen,
+    name,
+    dnaseq,
+    tax,
+    taxref,
+    taxdb,
+    species,
+    genus,
+    family,
+    order,
+    phylum,
+    classt,
+    strain,
+    pdb,
+    pdb_1,
+    pdb_2,
+    pdb_3,
+    path,
+    KO,
+) in mydata:
+
     # Create a new protein object
     new_prot = (
         session.query(Protein)
@@ -306,11 +352,13 @@ for (prot, protseq, NCBIid, uniprot, struct, gen, name, dnaseq,
         .first()
     )
     if not isinstance(new_prot, Protein):
-        new_prot = Protein(prot_id=prot,
-                           prot_seq = protseq,
-                           locus_NCBI_id = NCBIid,
-                           uniprot_ID = uniprot,
-                           struct_prot_type = struct)
+        new_prot = Protein(
+            prot_id=prot,
+            prot_seq=protseq,
+            locus_NCBI_id=NCBIid,
+            uniprot_ID=uniprot,
+            struct_prot_type=struct,
+        )
         session.add(new_prot)
         session.commit()
     # Create a new gene object
@@ -322,7 +370,7 @@ for (prot, protseq, NCBIid, uniprot, struct, gen, name, dnaseq,
         .first()
     )
     if not isinstance(new_gene, Gene):
-        new_gene = Gene(gen_id=gen, gen_name = name, dna_seq = dnaseq)
+        new_gene = Gene(gen_id=gen, gen_name=name, dna_seq=dnaseq)
         session.add(new_gene)
         session.commit()
 
