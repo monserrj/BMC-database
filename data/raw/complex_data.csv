@@ -1,0 +1,8 @@
+﻿complex_id,complex_type,complex_activity,assembly_exp_tested,complex_source
+1,Pdu1AB,active,Y,native
+2,HO,inactive,Y,experimental shell design
+3,Eut1,active,Y,native
+4,Pdu1AB,inactive,Y,experimental shell design
+5,Pdu1AB,inactive,Y,experimental shell design
+6,Eut1,inactive,Y,experimental shell design
+7,HO,active,N,native
