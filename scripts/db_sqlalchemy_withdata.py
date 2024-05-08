@@ -7,7 +7,7 @@
 # Import  SQLAlchemy classes needed with a declarative approach.
 
 from sqlalchemy.orm import declarative_base
-from sqlalchemy import Column, Integer, String, Table, ForeignKey, UniqueConstraint, VARCHAR
+from sqlalchemy import Column, Integer, String, Table, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship, backref
 
 # Create_engine function to create an engine object
@@ -117,8 +117,8 @@ class Protein(Base):
 
     prot_id = Column(Integer, primary_key=True)  # primary key column
     prot_seq = Column(String, nullable=False, unique=True)  # sequence string
-    locus_NCBI_ID = Column(VARCHAR)
-    uniprot_ID = Column (VARCHAR)
+    locus_NCBI_ID = Column(String)
+    uniprot_ID = Column (String)
     struct_prot_type = Column (Integer, nullable = True)
   
 class Gene(Base):
@@ -148,7 +148,7 @@ class Taxon(Base):
 
     __tablename__ = "taxon"
     tax_id = Column(Integer, primary_key=True)  # primary key column
-    tax_ref = Column(VARCHAR, unique=True, nullable=False) # accession number in db
+    tax_ref = Column(String, unique=True, nullable=False) # accession number in db
     tax_db = Column(String, nullable=False) # Name of database used (e.g.: NCBI, GTDB)
     species = Column(String, nullable=False)
     genus = Column(String)
@@ -173,9 +173,9 @@ class Pdb(Base):
 
     __tablename__ = "pdb"
     pdb_id = Column(Integer, primary_key=True)  # primary key column
-    pdb_acc_1 = Column(VARCHAR, unique=True) # primary accession number in pdb
-    pdb_acc_2 = Column(VARCHAR, nullable=False) # accession number
-    pdb_acc_3 = Column(VARCHAR, nullable=False) # accession number 
+    pdb_acc_1 = Column(String, unique=True) # primary accession number in pdb
+    pdb_acc_2 = Column(String, nullable=False) # accession number
+    pdb_acc_3 = Column(String, nullable=False) # accession number 
 
 # A one-to-many relationship between Protein and Pdb structure
     protein_pdb = relationship("pdb", secondary=proteinpdb)  
@@ -190,7 +190,7 @@ class Domain(Base):
 
     __tablename__ = "domain"
     dom_id = Column(Integer, primary_key=True)  # primary key column
-    dom_ref = Column(VARCHAR, unique=True, nullable=False) # domain accession in external db
+    dom_ref = Column(String, unique=True, nullable=False) # domain accession in external db
     dom_db = Column(Integer, nullable=False) # external database name e.g. pfam, CDD
 
 # A many-to-many relationship between Protein and domain family
@@ -209,7 +209,7 @@ class Function(Base):
 
     __tablename__ = "Function"
     go_id = Column(Integer, primary_key=True)  # primary key column
-    go_ref = Column(VARCHAR, unique=True, nullable=False) # accession number in GO
+    go_ref = Column(String, unique=True, nullable=False) # accession number in GO
     go_type = Column(String, nullable=False) # GO type (MF,CC,BP)
     go_description = Column(String, nullable=False) # text description of function
 
@@ -229,7 +229,7 @@ class Enzyme_path(Base):
 
     __tablename__ = "enzyme_path"
     path_id = Column(Integer, primary_key=True)  # primary key column
-    KO_ref = Column(VARCHAR, unique=True, nullable=False) # accession number in KO
+    KO_ref = Column(String, unique=True, nullable=False) # accession number in KO
 
 # A many-to-many relationship between Protein and enzymatic activity
     proteinpath = relationship("enzyme_path", secondary=proteinpath)  
