@@ -236,7 +236,7 @@ class Enzyme_path(Base):
 # To enforce unique enzymatic pathway references
     __table_args__ = (UniqueConstraint("path_id", "KO_ref"))
     
- class Complex(Base):
+class Complex(Base):
     """Table representing the complex that can be form by the interaction
     between several proteins, including native BMC or engineered ones
 
