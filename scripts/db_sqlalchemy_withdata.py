@@ -1,13 +1,12 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 
 # This script is the development of the BMC db following the 
 # BMC-database-skeleton.sql file. Instructions from create_Db.py file
 # followed and explanations needed kept to help following through
 
 # Import  SQLAlchemy classes needed with a declarative approach.
-
 from sqlalchemy.orm import declarative_base
-from sqlalchemy import Column, Integer, String, Table, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Table, ForeignKey, UniqueConstraint, String
 from sqlalchemy.orm import relationship, backref
 
 # Create_engine function to create an engine object
@@ -43,7 +42,7 @@ proteingene = Table(
     # To enforce unique combinations of protein, gene ID and rank
     # to ensure several names from a protein/gene are
     # not made principal
-    __table_args__ = (UniqueConstraint("prot_id", "gene_id", "name_rank"))
+   UniqueConstraint("prot_id", "gen_id", "name_rank"), # Remove table_args if not class
 )
 
 proteintaxon = Table(
@@ -51,6 +50,7 @@ proteintaxon = Table(
     Base.metadata,
     Column("prot_id", Integer, ForeignKey("protein.prot_id")),
     Column ("tax_id", Integer, ForeignKey("taxon.tax_id")),
+    UniqueConstraint("prot_id", "tax_id"),
 )            
             
 proteinpdb = Table(
@@ -78,7 +78,7 @@ proteinGO = Table(
     "protein_GO",
     Base.metadata,
     Column("prot_id", Integer, ForeignKey("protein.prot_id")),
-    Column("go_id", Integer, ForeignKey("function_GO.go_id")),
+    Column("go_id", Integer, ForeignKey("function.go_id")),
 )
 
 proteinpath = Table(
@@ -138,7 +138,7 @@ class Gene(Base):
     # A one-to-many relationship between Protein and Gene
     protein_gene = relationship("gene", secondary=proteingene)
 
-class Taxon(Base):
+class Taxonomy(Base):
     """Table representing the taxon accession of a protein
 
     This table will store the taxon origin of the protein sequence, e.g.:
@@ -162,7 +162,7 @@ class Taxon(Base):
     protein_taxon = relationship("taxon", secondary=proteintaxon)
 
 # To enforce unique taxon references
-    __table_args__ = (UniqueConstraint("tax_id", "tax_ref"))
+    __table_args__ = (UniqueConstraint("tax_id", "tax_ref"),)
         
 class Pdb(Base):
     """Table representing the Pdb accession of a protein
@@ -196,7 +196,7 @@ class Domain(Base):
 # A many-to-many relationship between Protein and domain family
     protein_domain = relationship("domain", secondary=proteindomain)  
 # To enforce unique domain family references
-    __table_args__ = (UniqueConstraint("dom_id", "dom_ref"))
+    __table_args__ = (UniqueConstraint("dom_id", "dom_ref"),)
     
 class Function(Base):
     """Table representing a function of a protein
@@ -207,7 +207,7 @@ class Function(Base):
     or BP (biological process)
     """
 
-    __tablename__ = "Function"
+    __tablename__ = "function"
     go_id = Column(Integer, primary_key=True)  # primary key column
     go_ref = Column(String, unique=True, nullable=False) # accession number in GO
     go_type = Column(String, nullable=False) # GO type (MF,CC,BP)
@@ -216,7 +216,7 @@ class Function(Base):
 # A many-to-many relationship between Protein and function
     protein_GO = relationship("function", secondary=proteinGO)  
 # To enforce unique function references
-    __table_args__ = (UniqueConstraint("go_id", "go_ref"))
+    __table_args__ = (UniqueConstraint("go_id", "go_ref"),)
     
 class Enzyme_path(Base):
     """Table representing the enzymatic reaction in which the protein
@@ -234,9 +234,9 @@ class Enzyme_path(Base):
 # A many-to-many relationship between Protein and enzymatic activity
     proteinpath = relationship("enzyme_path", secondary=proteinpath)  
 # To enforce unique enzymatic pathway references
-    __table_args__ = (UniqueConstraint("path_id", "KO_ref"))
+    __table_args__ = (UniqueConstraint("path_id", "KO_ref"),)
     
- class Complex(Base):
+class Complex(Base):
     """Table representing the complex that can be form by the interaction
     between several proteins, including native BMC or engineered ones
 
@@ -256,8 +256,7 @@ class Enzyme_path(Base):
 # A many-to-many relationship between Protein and enzymatic activity
     proteincomplex = relationship("complex", secondary=proteincomplex)
 # To enforce unique no repeated complexes are created
-    __table_args__ = (UniqueConstraint("complex_id", "complex_type", "complex_activity", "assembly_exp_tested", "complex_source"))
-    
+    __table_args__ = (UniqueConstraint("complex_id", "complex_type", "complex_activity", "assembly_exp_tested", "complex_source"),)
 
 # Now that we have defined the tables, we can create the tables in the
 # database.
