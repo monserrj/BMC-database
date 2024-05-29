@@ -273,7 +273,7 @@ import csv
 
 # Open the csv files
 # Open the CSV file
-csv_file_path = 'prot_info.csv'  # Update with your file path
+csv_file_path = 'prot_data.csv'
 mydata = []
 with open(csv_file_path, newline='') as csvfile:
     reader = csv.reader(csvfile)
@@ -291,44 +291,100 @@ session = Session()
 # and update the corresponding tables accordingly if they do not.
 # We can then update the linker tables by adding the corresponding items.
 for (prot, protseq, NCBIid, uniprot, struct, gen, name, dnaseq, 
-     tax, taxref, taxdb, species, genus, family, order, phylum, 
-     classt, strain, pdb, pdb_1, pdb_2, pdb_3, path, KO) in mydata:
+     tax, taxref, taxdb, spec, genu, fam, order, phyl, 
+     classt, stra, pdbid, pdb_1, pdb_2, pdb_3, path, KO) in mydata:
     
-    # Create a new protein object
-    new_prot = (
-        session.query(Protein)
-        .filter(Protein.prot_id == prot)
-        .filter(Protein.prot_seq == protseq)
-        .filter(Protein.locus_NCBI_ID == NCBIid)
-        .filter(Protein.uniprot_ID == uniprot)
-        .filter(Protein.struct_prot_type == struct)
-        .first()
-    )
-    if not isinstance(new_prot, Protein):
-        new_prot = Protein(prot_id=prot,
-                           prot_seq = protseq,
-                           locus_NCBI_id = NCBIid,
-                           uniprot_ID = uniprot,
-                           struct_prot_type = struct)
-        session.add(new_prot)
-        session.commit()
-    # Create a new gene object
-    new_gene = (
-        session.query(Gene)
-        .filter(Gene.gen_id == gen)
-        .filter(Gene.gen_name == name)
-        .filter(Gene.dna_seq == dnaseq)
-        .first()
-    )
-    if not isinstance(new_gene, Gene):
+        # Create a new protein object
+        new_prot = (
+            session.query(Protein)
+            .filter(Protein.prot_id == prot)
+            .filter(Protein.prot_seq == protseq)
+            .filter(Protein.locus_NCBI_ID == NCBIid)
+            .filter(Protein.uniprot_ID == uniprot)
+            .filter(Protein.struct_prot_type == struct)
+            .first()
+        )
+        if not isinstance(new_prot, Protein):
+            new_prot = Protein(prot_id=prot,
+                            prot_seq = protseq,
+                            locus_NCBI_id = NCBIid,
+                            uniprot_ID = uniprot,
+                            struct_prot_type = struct)
+            session.add(new_prot)
+            session.commit()
+        # Create a new gene object
+        new_gene = (
+            session.query(Gene)
+            .filter(Gene.gen_id == gen)
+            .filter(Gene.gen_name == name)
+            .filter(Gene.dna_seq == dnaseq)
+            .first()
+        )
+if not isinstance(new_gene, Gene):
         new_gene = Gene(gen_id=gen, gen_name = name, dna_seq = dnaseq)
         session.add(new_gene)
+        session.commit()
+
+    # Create new tax
+new_tax = (
+        session.query(Taxonomy)
+        .filter(Taxonomy.tax_id == tax)
+        .filter(Taxonomy.tax_ref == taxref)
+        .filter(Taxonomy.tax_db == taxdb)
+        .filter(Taxonomy.species == spec)
+        .filter(Taxonomy.genus == genu)
+        .filter(Taxonomy.family == fam)
+        .filter(Taxonomy.order_tax == order)
+        .filter(Taxonomy.phylum == phyl)
+        .filter(Taxonomy.class_tax == classt)
+        .filter(Taxonomy.strain == stra)
+        .first
+)
+    if not isinstance(new_tax, Taxonomy):
+        new_tax = Taxonomy(tax_id=tax,
+        tax_ref=taxref,
+        tax_db=taxdb,
+        species=spec,
+        genus=genu,
+        family=fam,
+        order_tax=order,
+        phylum=phyl,
+        class_tax=classt,
+        strain=stra)
+        session.add(new_tax)
+        session.commit()
+
+    new_pdb = (
+        session.query(Pdb)
+        .filter(Pdb.pdb_id == pdbid)
+        .filter(Pdb.pdb_acc_1 == pdb_1)
+        .filter(Pdb.pdb_acc_2 == pdb_2)
+        .filter(Pdb.pdb_acc_3 == pdb_3)
+        .first
+    )
+    if not isinstance(new_pdb, Pdb):
+        new_pdb = Pdb(pdb_id=pdbid, pdb_acc_1=pdb_1,
+        pdb_acc_2=pdb_2, pdb_acc_3=pdb_3)
+        session.add(new_pdb)
+        session.commit()
+
+    new_path = (
+        session.query(Enzyme_path)
+        .filter(Enzyme_path.path_id == path)
+        .filter(Enzyme_path.KO_ref == KO)
+        .first
+    )
+    if not isinstance(new_path, Enzyme_path):
+        new_path = Enzyme_path(path_id=path, KO_ref=KO)
+        session.add(new_path)
         session.commit()
 
     # Add the protein to the Protein_gene
     new_prot.Protein_gene.append(new_prot)
     session.commit()
-    # Should I add the gene to it too?
+    # Should I add all of them?
+
+
 
 # Now we can query the database to see if the data has been added correctly
 # Unsure whether I understand this correctly
