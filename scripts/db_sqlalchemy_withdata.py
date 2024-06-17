@@ -12,7 +12,7 @@ from pathlib import Path
 # Import  SQLAlchemy classes needed with a declarative approach.
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import Column, Integer, String, Table, ForeignKey, UniqueConstraint, String
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy.orm import relationship
 
 # Create_engine function to create an engine object
 from sqlalchemy import create_engine
@@ -102,8 +102,6 @@ proteincomplex = Table(
     Base.metadata,
     Column("prot_id", Integer, ForeignKey("protein.prot_id")),
     Column("complex_id", Integer, ForeignKey("complex.complex_id")),
-    # These 3 may need to get some extra debugging as they were commented by Leighton
-    # to get pass this point
     Column("prot_essential_assembly", Integer),
     Column("interact_prot_id", Integer, ForeignKey("protein.prot_id")),
     Column("copy_number", Integer),
@@ -280,7 +278,7 @@ class Enzyme_path(Base):
 
     # A many-to-many relationship between Protein and enzymatic activity
     protein = relationship("Protein", secondary=proteinpath,
-                                back_populates="path",
+                                back_populates="enzyme_path",
                                 lazy="dynamic")
     # To enforce unique enzymatic pathway references
     __table_args__ = (UniqueConstraint("path_id", "KO_ref"),)
@@ -303,7 +301,7 @@ class Complex(Base):
     complex_source = Column(String, nullable=False) #Native/engineered/theoretical...
 
     # A many-to-many relationship between Protein and enzymatic activity
-    protein = relationship("Protein", secondary=proteincomplex,
+    proteins = relationship("Protein", secondary=proteincomplex,
                                 back_populates="complex",
                                 lazy="dynamic")
 
@@ -323,52 +321,52 @@ Base.metadata.create_all(engine)
 
 # Open the csv files:
 # All files are stored in the same directory
-datadir = Path("../data/raw")
+# datadir = Path("../data/raw")
 
-# Open CSV file prot_data
+# # Open CSV file prot_data
 
-csv_file_path_1 = datadir /'prot_data.csv'
-mydata = []
-with open(csv_file_path_1, newline='') as csvfile:
-    reader = csv.reader(csvfile)
-    next(reader)  # Skip header row
-    for row in reader:
-        mydata.append(tuple(row))
+# csv_file_path_1 = datadir /'prot_data.csv'
+# mydata = []
+# with open(csv_file_path_1, newline='') as csvfile:
+#     reader = csv.reader(csvfile)
+#     next(reader)  # Skip header row
+#     for row in reader:
+#         mydata.append(tuple(row))
 
-# # Start the session
-Session = sessionmaker()  # we also need a session object
-Session.configure(bind=engine)
-session = Session()
+# # # Start the session
+# Session = sessionmaker()  # we also need a session object
+# Session.configure(bind=engine)
+# session = Session()
 
-# Add the data to the database
-# We need to check if the sequence, structure, and accession already exist,
-# and update the corresponding tables accordingly if they do not.
-# We can then update the linker tables by adding the corresponding items.
-for (prot, protseq, NCBIid, uniprot, struct, gen, name, dnaseq, 
-     tax, taxref, taxdb, spec, genu, fam, order, phyl, 
-     classt, stra, pdbid, pdb_1, pdb_2, pdb_3, path, KOid) in mydata:
+# # Add the data to the database
+# # We need to check if the sequence, structure, and accession already exist,
+# # and update the corresponding tables accordingly if they do not.
+# # We can then update the linker tables by adding the corresponding items.
+# for (prot, protseq, NCBIid, uniprot, struct, gen, name, dnaseq, 
+#      tax, taxref, taxdb, spec, genu, fam, order, phyl, 
+#      classt, stra, pdbid, pdb_1, pdb_2, pdb_3, path, KOid) in mydata:
     
-    # Check what data is available:
-    # print(prot,protseq,NCBIid)
+#     # Check what data is available:
+#     # print(prot,protseq,NCBIid)
 
-        # Create a new protein object
-    new_prot = (
-        session.query(Protein)
-        .filter(Protein.prot_id == prot)
-        .filter(Protein.prot_seq == protseq)
-        .filter(Protein.locus_NCBI_id == NCBIid)
-        .filter(Protein.uniprot_id == uniprot)
-        .filter(Protein.struct_prot_type == struct)
-        .first()
-        )
-    if not isinstance(new_prot, Protein):
-        new_prot = Protein(prot_id=prot,
-                        prot_seq = protseq,
-                        locus_NCBI_id = NCBIid,
-                        uniprot_id = uniprot,
-                        struct_prot_type = struct)
-        session.add(new_prot)
-        session.commit()
+#         # Create a new protein object
+#     new_prot = (
+#         session.query(Protein)
+#         .filter(Protein.prot_id == prot)
+#         .filter(Protein.prot_seq == protseq)
+#         .filter(Protein.locus_NCBI_id == NCBIid)
+#         .filter(Protein.uniprot_id == uniprot)
+#         .filter(Protein.struct_prot_type == struct)
+#         .first()
+#         )
+#     if not isinstance(new_prot, Protein):
+#         new_prot = Protein(prot_id=prot,
+#                         prot_seq = protseq,
+#                         locus_NCBI_id = NCBIid,
+#                         uniprot_id = uniprot,
+#                         struct_prot_type = struct)
+#         session.add(new_prot)
+#         session.commit()
 
 #     # Create a new gene object
 #     new_gene = (
