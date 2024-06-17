@@ -151,10 +151,12 @@ class Protein(Base):
     path = relationship("Enzyme_path", secondary=proteinpath,
                                 back_populates="protein",
                                 lazy="dynamic")
-    complex = relationship("Complex", secondary=proteincomplex,
+    complexmain = relationship("Complex", foreign_keys=['prot_id'],
                                 back_populates="protein",
                                 lazy="dynamic")
-
+    complexinteract = relationship("Complex", foreign_keys=['interact_prot_id'],
+                                back_populates="protein",
+                                lazy="dynamic")
 class Gene(Base):
     """Table representing a gene name and DNA sequence
 
@@ -323,31 +325,34 @@ Base.metadata.create_all(engine)
 # All files are stored in the same directory
 # datadir = Path("../data/raw")
 
-# # Open CSV file prot_data
+# Open CSV file prot_data
+# Define path for all data files
+raw_dir = Path(__file__).resolve().parent.parent / 'data'/'raw'
+#Define path to the prot_data file
+prot_data_file = raw_dir / 'prot_data.csv'
 
-# csv_file_path_1 = datadir /'prot_data.csv'
-# mydata = []
-# with open(csv_file_path_1, newline='') as csvfile:
-#     reader = csv.reader(csvfile)
-#     next(reader)  # Skip header row
-#     for row in reader:
-#         mydata.append(tuple(row))
+mydata = []
+with open(prot_data_file, newline='') as csvfile:
+    reader = csv.reader(csvfile)
+    next(reader)  # Skip header row
+    for row in reader:
+        mydata.append(tuple(row))
 
-# # # Start the session
-# Session = sessionmaker()  # we also need a session object
-# Session.configure(bind=engine)
-# session = Session()
+# Start the session
+Session = sessionmaker()  # we also need a session object
+Session.configure(bind=engine)
+session = Session()
 
-# # Add the data to the database
-# # We need to check if the sequence, structure, and accession already exist,
-# # and update the corresponding tables accordingly if they do not.
-# # We can then update the linker tables by adding the corresponding items.
-# for (prot, protseq, NCBIid, uniprot, struct, gen, name, dnaseq, 
-#      tax, taxref, taxdb, spec, genu, fam, order, phyl, 
-#      classt, stra, pdbid, pdb_1, pdb_2, pdb_3, path, KOid) in mydata:
+# Add the data to the database
+# We need to check if the sequence, structure, and accession already exist,
+# and update the corresponding tables accordingly if they do not.
+# We can then update the linker tables by adding the corresponding items.
+for (prot, protseq, NCBIid, uniprot, struct, gen, name, dnaseq, 
+     tax, taxref, taxdb, spec, genu, fam, order, phyl, 
+     classt, stra, pdbid, pdb_1, pdb_2, pdb_3, path, KOid) in mydata:
     
-#     # Check what data is available:
-#     # print(prot,protseq,NCBIid)
+    # Check what data is available:
+    # print(prot,protseq,NCBIid)
 
 #         # Create a new protein object
 #     new_prot = (
