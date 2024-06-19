@@ -94,18 +94,18 @@ proteinpath = Table(
     "protein_path",
     Base.metadata,
     Column("prot_id", Integer, ForeignKey("protein.prot_id")),
-    Column("path_id", Integer, ForeignKey("enzyme_path.path_id")),
+    Column("path_id", Integer, ForeignKey("enzymepath.path_id")),
 )
 
-proteincomplex = Table(
-    "protein_complex",
-    Base.metadata,
-    Column("prot_id", Integer, ForeignKey("protein.prot_id")),
-    Column("complex_id", Integer, ForeignKey("complex.complex_id")),
-    Column("prot_essential_assembly", Integer),
-    Column("interact_prot_id", Integer, ForeignKey("protein.prot_id")),
-    Column("copy_number", Integer),
-)
+# proteincomplex = Table(
+#     "protein_complex",
+#     Base.metadata,
+#     Column("main_prot_id", Integer, ForeignKey("protein.prot_id")),
+#     Column("complex_id", Integer, ForeignKey("complex.complex_id")),
+#     Column("prot_essential_assembly", Integer),
+#     Column("interact_prot_id", Integer, ForeignKey("protein.prot_id")),
+#     Column("copy_number", Integer),
+# )
 
 
 # Create a class corresponding to each database table. No classes
@@ -124,7 +124,7 @@ class Protein(Base):
 
     __tablename__ = "protein"  # this is the name that will be used in SQLite
 
-    prot_id = Column(Integer, primary_key=True)  # primary key column
+    prot_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column. Added autoincrement
     prot_seq = Column(String, nullable=False, unique=True)  # sequence string
     locus_NCBI_id = Column(String)
     uniprot_id = Column (String)
@@ -148,15 +148,17 @@ class Protein(Base):
     function = relationship("Function", secondary=proteinGO,
                                 back_populates="protein",
                                 lazy="dynamic")
-    path = relationship("Enzyme_path", secondary=proteinpath,
-                                back_populates="protein",
-                                lazy="dynamic")
-    complexmain = relationship("Complex", foreign_keys=['prot_id'],
-                                back_populates="protein",
-                                lazy="dynamic")
-    complexinteract = relationship("Complex", foreign_keys=['interact_prot_id'],
-                                back_populates="protein",
-                                lazy="dynamic")
+    path = relationship("Enzymepath", secondary=proteinpath,
+                                 back_populates="protein",
+                                 lazy="dynamic")
+    # main_prot = relationship("Complex", secondary=proteincomplex,
+    #                             foreign_keys=[proteincomplex.c.main_prot_id],
+    #                             back_populates="protein",
+    #                             lazy="dynamic")
+    # interact_prot = relationship("Complex",  secondary=proteincomplex,
+    #                             foreign_keys=[proteincomplex.c.interact_prot_id],
+    #                             back_populates="protein_2",
+    #                             lazy="dynamic")
 class Gene(Base):
     """Table representing a gene name and DNA sequence
 
@@ -166,7 +168,7 @@ class Gene(Base):
 
     __tablename__ = "gene"
     
-    gen_id = Column(Integer, primary_key=True)  # primary key column
+    gen_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
     gen_name = Column(Integer, nullable=False)
     dna_seq = Column(String, nullable=False)
 
@@ -185,7 +187,7 @@ class Taxonomy(Base):
     """
 
     __tablename__ = "taxon"
-    tax_id = Column(Integer, primary_key=True)  # primary key column
+    tax_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
     tax_ref = Column(String, unique=True, nullable=False) # accession number in db
     tax_db = Column(String, nullable=False) # Name of database used (e.g.: NCBI, GTDB)
     species = Column(String, nullable=False)
@@ -212,7 +214,7 @@ class Pdb(Base):
     """
 
     __tablename__ = "pdb"
-    pdb_id = Column(Integer, primary_key=True)  # primary key column
+    pdb_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
     pdb_acc_1 = Column(String, unique=True) # primary accession number in pdb
     pdb_acc_2 = Column(String, nullable=False) # accession number
     pdb_acc_3 = Column(String, nullable=False) # accession number 
@@ -231,7 +233,7 @@ class Domain(Base):
     """
 
     __tablename__ = "domain"
-    dom_id = Column(Integer, primary_key=True)  # primary key column
+    dom_id = Column(Integer, primary_key=True,autoincrement=True)  # primary key column
     dom_ref = Column(String, unique=True, nullable=False) # domain accession in external db
     dom_db = Column(Integer, nullable=False) # external database name e.g. pfam, CDD
 
@@ -253,7 +255,7 @@ class Function(Base):
     """
 
     __tablename__ = "function"
-    go_id = Column(Integer, primary_key=True)  # primary key column
+    go_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
     go_ref = Column(String, unique=True, nullable=False) # accession number in GO
     go_type = Column(String, nullable=False) # GO type (MF,CC,BP)
     go_description = Column(String, nullable=False) # text description of function
@@ -265,7 +267,7 @@ class Function(Base):
     # To enforce unique function references
     __table_args__ = (UniqueConstraint("go_id", "go_ref"),)
     
-class Enzyme_path(Base):
+class Enzymepath(Base):
     """Table representing the enzymatic reaction in which the protein
     participates
 
@@ -274,41 +276,44 @@ class Enzyme_path(Base):
     more than one reference
     """
 
-    __tablename__ = "enzyme_path"
-    path_id = Column(Integer, primary_key=True)  # primary key column
+    __tablename__ = "enzymepath"
+    path_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
     KO_ref = Column(String, unique=True, nullable=False) # accession number in KO
 
     # A many-to-many relationship between Protein and enzymatic activity
     protein = relationship("Protein", secondary=proteinpath,
-                                back_populates="enzyme_path",
+                                back_populates="path",
                                 lazy="dynamic")
     # To enforce unique enzymatic pathway references
     __table_args__ = (UniqueConstraint("path_id", "KO_ref"),)
     
-class Complex(Base):
-    """Table representing the complex that can be form by the interaction
-    between several proteins, including native BMC or engineered ones
+# class Complex(Base):
+#     """Table representing the complex that can be form by the interaction
+#     between several proteins, including native BMC or engineered ones
 
-    This table will store the complex features, including the type (e.g: pdu, eut),
-    whether is has enzymatic activty or not, if it has been experimentally tested
-    whether it assembles or not, the origin of the complex (meaning whether is it
-    a native complex, engineered or created with a theorical or bioinformatic approach)
-    """
+#     This table will store the complex features, including the type (e.g: pdu, eut),
+#     whether is has enzymatic activty or not, if it has been experimentally tested
+#     whether it assembles or not, the origin of the complex (meaning whether is it
+#     a native complex, engineered or created with a theorical or bioinformatic approach)
+#     """
 
-    __tablename__ = "complex"
-    complex_id = Column(Integer, primary_key=True)  # primary key column
-    complex_type = Column(String) # Classification undecided (pdueut,grm..)
-    complex_activity = Column(String, nullable=False) # Active/Inactive
-    assembly_exp_tested = Column(String, nullable=False) #Y/N. If Y reference paper?
-    complex_source = Column(String, nullable=False) #Native/engineered/theoretical...
+#     __tablename__ = "complex"
+#     complex_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
+#     complex_type = Column(String) # Classification undecided (pdueut,grm..)
+#     complex_activity = Column(String, nullable=False) # Active/Inactive
+#     assembly_exp_tested = Column(String, nullable=False) #Y/N. If Y reference paper?
+#     complex_source = Column(String, nullable=False) #Native/engineered/theoretical...
 
-    # A many-to-many relationship between Protein and enzymatic activity
-    proteins = relationship("Protein", secondary=proteincomplex,
-                                back_populates="complex",
-                                lazy="dynamic")
-
-    # To enforce unique no repeated complexes are created
-    __table_args__ = (UniqueConstraint("complex_id", "complex_type", "complex_activity", "assembly_exp_tested", "complex_source"),)
+#     # A many-to-many relationship between Protein and enzymatic activity
+#     protein = relationship("Protein", secondary=proteincomplex,
+#                                  #foreign_keys=[complex_id],
+#                                  back_populates="X",
+#                                  lazy="dynamic")
+#     protein_2 = relationship("Protein", secondary=proteincomplex,
+#                                  back_populates="X",
+#                                  lazy="dynamic")
+# # To enforce unique no repeated complexes are created
+#     __table_args__ = (UniqueConstraint("complex_id", "complex_type", "complex_activity", "assembly_exp_tested", "complex_source"),)
 
 # Now that we have defined the tables, we can create the tables in the
 # database.
@@ -349,101 +354,123 @@ session = Session()
 # We can then update the linker tables by adding the corresponding items.
 for (prot, protseq, NCBIid, uniprot, struct, gen, name, dnaseq, 
      tax, taxref, taxdb, spec, genu, fam, order, phyl, 
-     classt, stra, pdbid, pdb_1, pdb_2, pdb_3, path, KOid) in mydata:
-    
+     classt, stra, pdbid, pdb_1, pdb_2, pdb_3, pathid, KOid) in mydata:
+    # I removed prot so it is added automatically. Does it work that way?
+
     # Check what data is available:
-    # print(prot,protseq,NCBIid)
+    print(prot, protseq, NCBIid)
 
-#         # Create a new protein object
-#     new_prot = (
-#         session.query(Protein)
-#         .filter(Protein.prot_id == prot)
-#         .filter(Protein.prot_seq == protseq)
-#         .filter(Protein.locus_NCBI_id == NCBIid)
-#         .filter(Protein.uniprot_id == uniprot)
-#         .filter(Protein.struct_prot_type == struct)
-#         .first()
-#         )
-#     if not isinstance(new_prot, Protein):
-#         new_prot = Protein(prot_id=prot,
-#                         prot_seq = protseq,
-#                         locus_NCBI_id = NCBIid,
-#                         uniprot_id = uniprot,
-#                         struct_prot_type = struct)
-#         session.add(new_prot)
-#         session.commit()
+        # Check if protein already exists
+    existing_prot = (
+        session.query(Protein)
+        # .filter(Protein.prot_id == prot) So it is added automatically
+        .filter(Protein.prot_seq == protseq)
+        .filter(Protein.locus_NCBI_id == NCBIid)
+        .filter(Protein.uniprot_id == uniprot)
+        # .filter(Protein.struct_prot_type == struct) It can be the same to others (is just the type: Hexamer, pentamer...)
+        .first()
+        )
+    if not existing_prot:
+        new_prot = Protein(
+                        prot_seq = protseq,
+                        locus_NCBI_id = NCBIid,
+                        uniprot_id = uniprot,
+                        struct_prot_type = struct)
+        session.add(new_prot)
+        session.commit()
+    else:
+        print(f"Protein with prot id {prot} and NCBI_id {NCBIid} already exist")
 
-#     # Create a new gene object
-#     new_gene = (
-#         session.query(Gene)
-#         .filter(Gene.gen_id == gen)
-#         .filter(Gene.gen_name == name)
-#         .filter(Gene.dna_seq == dnaseq)
-#         .first()
-#     )
-#     if not isinstance(new_gene, Gene):
-#         new_gene = Gene(gen_id=gen, gen_name = name, dna_seq = dnaseq)
-#         session.add(new_gene)
-#         session.commit()
+    print(prot,protseq,NCBIid, uniprot, struct)
 
-#     # Create new tax
-#     # new_tax = (
-#     #     session.query(Taxonomy)
-#     #     .filter(Taxonomy.tax_id == tax)
-#     #     .filter(Taxonomy.tax_ref == taxref)
-#     #     .filter(Taxonomy.tax_db == taxdb)
-#     #     .filter(Taxonomy.species == spec)
-#     #     .filter(Taxonomy.genus == genu)
-#     #     .filter(Taxonomy.family == fam)
-#     #     .filter(Taxonomy.order_tax == order)
-#     #     .filter(Taxonomy.phylum == phyl)
-#     #     .filter(Taxonomy.class_tax == classt)
-#     #     .filter(Taxonomy.strain == stra)
-#     #     .first
-#     # )
-#     # if not isinstance(new_tax, Taxonomy):
-#     #     new_tax = Taxonomy(tax_id = tax,
-#     #                     tax_ref = taxref,
-#     #                     ltax_db = taxdb,
-#     #                     species = spec,
-#     #                     genus = genu,
-#     #                     family = fam,
-#     #                     order_tax = order,
-#     #                     phylum = phyl,
-#     #                     class_tax = classt,
-#     #                     strain = stra)
-#         # session.add(new_tax)
-#         # session.commit()
+    # Create a new gene object
+    existing_gene = (
+        session.query(Gene)
+        # .filter(Gene.gen_id == gen) Do not matter if the gene ID is the same(same prot can have different names)
+        .filter(Gene.gen_name == name)
+        # .filter(Gene.dna_seq == dnaseq) Do not matter if the dna seq is the same (same prot can have different names)
+        .first()
+    )
+    if not existing_gene:
+        new_gene = Gene(gen_name = name, dna_seq = dnaseq)
+        session.add(new_gene)
+        session.commit()
+        
+    else:
+        print(f'This gene name {name} has already being added to this gene ID {gen}')
 
-#     new_pdb = (
-#         session.query(Pdb)
-#         .filter(Pdb.pdb_id == pdbid)
-#         .filter(Pdb.pdb_acc_1 == pdb_1)
-#         .filter(Pdb.pdb_acc_2 == pdb_2)
-#         .filter(Pdb.pdb_acc_3 == pdb_3)
-#         .first
-#     )
-#     if not isinstance(new_pdb, Pdb):
-#         new_pdb = Pdb(pdb_id = pdbid, pdb_acc_1 = pdb_1,
-#                     pdb_acc_2 = pdb_2, pdb_acc_3 = pdb_3)
-#         session.add(new_pdb)
-#         session.commit()
+    print(gen,name,dnaseq)
 
-#     new_path = (
-#         session.query(Enzyme_path)
-#         .filter(Enzyme_path.path_id == path)
-#         .filter(Enzyme_path.KO_ref == KOid)
-#         .first
-#     )
-#     if not isinstance(new_path, Enzyme_path):
-#         new_path = Enzyme_path(path_id = path, KO_ref = KOid)
-#         session.add(new_path)
-#         session.commit()
+    # Create new tax
+    existing_tax = (
+        session.query(Taxonomy)
+        #.filter(Taxonomy.tax_id == tax) ID automatically assigned
+        .filter(Taxonomy.tax_ref == taxref)
+        #.filter(Taxonomy.tax_db == taxdb) Same database for several references
+        #.filter(Taxonomy.species == spec)
+        #.filter(Taxonomy.genus == genu)
+        #.filter(Taxonomy.family == fam)
+        #.filter(Taxonomy.order_tax == order)
+        #.filter(Taxonomy.phylum == phyl)
+        #.filter(Taxonomy.class_tax == classt)
+        .filter(Taxonomy.strain == stra) # Strain should be unique no?
+        .first
+    )
+    if not existing_tax:
+        new_tax = Taxonomy(tax_ref = taxref,
+                        ltax_db = taxdb,
+                        species = spec,
+                        genus = genu,
+                        family = fam,
+                        order_tax = order,
+                        phylum = phyl,
+                        class_tax = classt,
+                        strain = stra)
+        session.add(new_tax)
+        session.commit()
+    else:
+        print(f'This taxon has already being added {tax, taxref}')
 
-#     # Add the protein to the Protein_gene
-#     new_prot.Protein_gene.append(new_prot)
-#     session.commit()
-#     # Should I add all of them?
+    print(tax,taxref,taxdb,spec,genu,fam,order,phyl,classt,stra)
+
+    # Create new pdb
+    existing_pdb = (
+        session.query(Pdb)
+        # .filter(Pdb.pdb_id == pdbid) Added automatically
+        .filter(Pdb.pdb_acc_1 == pdb_1)
+        .filter(Pdb.pdb_acc_2 == pdb_2)
+        .filter(Pdb.pdb_acc_3 == pdb_3)
+        .first
+    )
+    if not existing_pdb:
+        new_pdb = Pdb( pdb_acc_1 = pdb_1,
+                    pdb_acc_2 = pdb_2, pdb_acc_3 = pdb_3)
+        session.add(new_pdb)
+        session.commit()
+    else:
+        print(f' This pdb entry already exist {pdbid}')
+
+    print(pdbid,pdb_1,pdb_2,pdb_3)
+
+    # Create new enzyme path
+    existing_path = (
+        session.query(Enzymepath)
+        # .filter(Enzymepath.path_id == pathid) Added automatically
+        .filter(Enzymepath.KO_ref == KOid)
+        .first
+    )
+    if not existing_path:
+        new_path = Enzymepath(KO_ref = KOid)
+        session.add(new_path)
+        session.commit()
+    else:
+        print(f'Existing gene ontology reference {KOid}')
+
+    print(pathid,KOid)
+
+    # Add the data to the relationship tables
+    new_prot.proteingene.append(new_gene)
+    session.commit()
 
 
 
