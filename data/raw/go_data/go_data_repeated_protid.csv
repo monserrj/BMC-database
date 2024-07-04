@@ -1,0 +1,6 @@
+﻿prot_id,go_id,go_ref,go_type,go_description
+1,1,0051144,BP,"propanediol catabolic process: The chemical reactions and pathways resulting in the breakdown of propanediol, a sweet, colorless, viscous, hygroscopic liquid with the formula CH3-CHOH-CH2OH"
+1,2,0031469,CC,Bacterial microcompartment: An organelle found in bacteria consisting of a proteinaceous coat containing metabolic enzymes whose purpose is the sequestration or concentration of metabolites and which has the appearance of a polygonal granule by electron microscopy
+3,4,0016491,MF,"oxidoreductase activity: Catalysis of an oxidation-reduction (redox) reaction, a reversible chemical reaction in which the oxidation state of an atom or atoms within a molecule is altered. One substrate acts as a hydrogen or electron donor and becomes oxidized, while the other acts as hydrogen or electron acceptor and becomes reduced"
+5,6,0046336,BP,"ethanolamine catabolic process: The chemical reactions and pathways resulting in the breakdown of ethanolamine (2-aminoethanol), an important water-soluble base of phospholipid (phosphatidylethanolamine"
+8,8,0005198,MF,structural molecule activity: The action of a molecule that contributes to the structural integrity of a complex
