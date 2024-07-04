@@ -386,7 +386,7 @@ for (protid, protseq, NCBIid, uniprot, struct, genid, name, dnaseq,
     # Create a new gene object
     existing_gene = (
         session.query(Gene)
-        # .filter(Gene.gen_id == genid) Do not matter if the gene ID is the same(same prot can have different names)
+        # .filter(Gene.gen_id == genid) automatically assigned
         .filter(Gene.gen_name == name)
         # .filter(Gene.dna_seq == dnaseq) Do not matter if the dna seq is the same (same prot can have different names)
         .first()
