@@ -109,12 +109,12 @@ proteinpath = Table(
 )
 
 # proteincomplex = Table(
-#     "protein_complex",
-#     Base.metadata,
-#     Column("main_prot_id", Integer, ForeignKey("protein.prot_id")),
+#      "protein_complex",
+#      Base.metadata,
+#     Column("prot_id", Integer, ForeignKey("protein.prot_id")),
 #     Column("complex_id", Integer, ForeignKey("complex.complex_id")),
 #     Column("prot_essential_assembly", Integer),
-#     Column("interact_prot_id", Integer, ForeignKey("protein.prot_id")),
+#     Column("ppi_ID", Integer, ForeignKey("protein.prot_id")),
 #     Column("copy_number", Integer),
 # )
 
@@ -146,32 +146,30 @@ class Protein(Base):
     # introduced, they information will be backpopulated to be consistant accross
     # all tables. Relationships must be introduced in both related tables (e.g.:
     # Gene and Protein, with relationship based on table Proteingene)
-    gene = relationship(
-        "Gene", secondary=proteingene, back_populates="protein", lazy="dynamic"
+    genes = relationship(
+        "Gene", secondary=proteingene, back_populates="proteins", lazy="dynamic"
     )
-    taxon = relationship(
-        "Taxonomy", secondary=proteintaxon, back_populates="protein", lazy="dynamic"
+    taxons = relationship(
+        "Taxonomy", secondary=proteintaxon, back_populates="proteins", lazy="dynamic"
     )
-    pdb = relationship(
-        "Pdb", secondary=proteinpdb, back_populates="protein", lazy="dynamic"
+    pdbs = relationship(
+        "Pdb", secondary=proteinpdb, back_populates="proteins", lazy="dynamic"
     )
-    domain = relationship(
-        "Domain", secondary=proteindomain, back_populates="protein", lazy="dynamic"
+    domains = relationship(
+        "Domain", secondary=proteindomain, back_populates="proteins", lazy="dynamic"
     )
-    function = relationship(
-        "Function", secondary=proteinGO, back_populates="protein", lazy="dynamic"
+    functions = relationship(
+        "Function", secondary=proteinGO, back_populates="proteins", lazy="dynamic"
     )
-    path = relationship(
-        "Enzymepath", secondary=proteinpath, back_populates="protein", lazy="dynamic"
+    paths = relationship(
+        "Enzymepath", secondary=proteinpath, back_populates="proteins", lazy="dynamic"
     )
-    # main_prot = relationship("Complex", secondary=proteincomplex,
-    #                             foreign_keys=[proteincomplex.c.main_prot_id],
-    #                             back_populates="protein",
-    #                             lazy="dynamic")
-    # interact_prot = relationship("Complex",  secondary=proteincomplex,
-    #                             foreign_keys=[proteincomplex.c.interact_prot_id],
-    #                             back_populates="protein_2",
-    #                             lazy="dynamic")
+    # complexes = relationship(
+    #     "Complex", secondary=proteincomplex, back_populates="proteins", lazy="dynamic"
+    #     )
+    # interacts = relationship(
+    #     "Protprotinteract",  secondary=proteincomplex, back_populates="proteins", lazy="dynamic"
+    #     )
 
 
 class Gene(Base):
@@ -184,13 +182,13 @@ class Gene(Base):
     __tablename__ = "gene"
 
     gen_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
-    gen_name = Column(Integer, nullable=False)
+    gen_name = Column(String, nullable=False)
     dna_seq = Column(String, nullable=False)
 
     # Define relationships after defining columns
     # A one-to-many relationship between Protein and Gene
-    protein = relationship(
-        "Protein", secondary=proteingene, back_populates="gene", lazy="dynamic"
+    proteins = relationship(
+        "Protein", secondary=proteingene, back_populates="genes", lazy="dynamic"
     )
 
 
@@ -215,8 +213,8 @@ class Taxonomy(Base):
     strain = Column(String)
 
     # A many-to-one relationship between Protein and Taxonomy
-    protein = relationship(
-        "Protein", secondary=proteintaxon, back_populates="taxon", lazy="dynamic"
+    proteins = relationship(
+        "Protein", secondary=proteintaxon, back_populates="taxons", lazy="dynamic"
     )
 
     # To enforce unique taxon references
@@ -237,8 +235,8 @@ class Pdb(Base):
     pdb_acc_3 = Column(String, nullable=False)  # accession number
 
     # A one-to-many relationship between Protein and Pdb structure
-    protein = relationship(
-        "Protein", secondary=proteinpdb, back_populates="pdb", lazy="dynamic"
+    proteins = relationship(
+        "Protein", secondary=proteinpdb, back_populates="pdbs", lazy="dynamic"
     )
 
 
@@ -258,8 +256,8 @@ class Domain(Base):
     dom_db = Column(Integer, nullable=False)  # external database name e.g. pfam, CDD
 
     # A many-to-many relationship between Protein and domain family
-    protein = relationship(
-        "Protein", secondary=proteindomain, back_populates="domain", lazy="dynamic"
+    proteins = relationship(
+        "Protein", secondary=proteindomain, back_populates="domains", lazy="dynamic"
     )
 
     # To enforce unique domain family references
@@ -282,8 +280,8 @@ class Function(Base):
     go_description = Column(String, nullable=False)  # text description of function
 
     # A many-to-many relationship between Protein and function
-    protein = relationship(
-        "Protein", secondary=proteinGO, back_populates="function", lazy="dynamic"
+    proteins = relationship(
+        "Protein", secondary=proteinGO, back_populates="functions", lazy="dynamic"
     )
     # To enforce unique function references
     __table_args__ = (UniqueConstraint("go_id", "go_ref"),)
@@ -305,8 +303,8 @@ class Enzymepath(Base):
     KO_ref = Column(String, unique=True, nullable=False)  # accession number in KO
 
     # A many-to-many relationship between Protein and enzymatic activity
-    protein = relationship(
-        "Protein", secondary=proteinpath, back_populates="path", lazy="dynamic"
+    proteins = relationship(
+        "Protein", secondary=proteinpath, back_populates="paths", lazy="dynamic"
     )
     # To enforce unique enzymatic pathway references
     __table_args__ = (UniqueConstraint("path_id", "KO_ref"),)
@@ -330,15 +328,37 @@ class Enzymepath(Base):
 #     complex_source = Column(String, nullable=False) #Native/engineered/theoretical...
 
 #     # A many-to-many relationship between Protein and enzymatic activity
-#     protein = relationship("Protein", secondary=proteincomplex,
-#                                  #foreign_keys=[complex_id],
-#                                  back_populates="X",
-#                                  lazy="dynamic")
-#     protein_2 = relationship("Protein", secondary=proteincomplex,
-#                                  back_populates="X",
-#                                  lazy="dynamic")
+#     proteins = relationship(
+#         "Protein", secondary=proteincomplex, back_populates="complexes", lazy="dynamic")
+    
 # # To enforce unique no repeated complexes are created
 #     __table_args__ = (UniqueConstraint("complex_id", "complex_type", "complex_activity", "assembly_exp_tested", "complex_source"),)
+
+# class Prot_port_interact(Base):
+#     """Table representing the different specific interactions
+#     between several proteins inside a complex and during assembly
+
+#     This table will store the different proteins known to interact specifically.
+#     Prot_ID_1 will be the main protein, with the rest of the proteins being the
+#     ones interacting with it
+#     """
+
+#     __tablename__ = "prot_prot_interact"
+#     ppi_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
+#     prot_id_1 = Column(Integer, ForeignKey("Protein.prot_id"))
+#     prot_id_2 = Column(Integer, ForeignKey("Protein.prot_id"))
+#     prot_id_3 = Column(Integer, ForeignKey("Protein.prot_id"))
+#     prot_id_4 = Column(Integer, ForeignKey("Protein.prot_id"))
+#     prot_id_5 = Column(Integer, ForeignKey("Protein.prot_id"))
+#     prot_id_6 = Column(Integer, ForeignKey("Protein.prot_id"))
+#     prot_id_7 = Column(Integer, ForeignKey("Protein.prot_id"))
+#     # A many-to-many relationship between Protein and enzymatic activity
+#     proteins = relationship(
+#         "Protein", secondary=proteincomplex, back_populates="interacts", lazy="dynamic")
+    
+# # To enforce unique no repeated protein to protein interactions are created
+#     __table_args__ = (UniqueConstraint("prot_id_1", "prot_id_2", "prot_id_3", "prot_id_4", "prot_id_5", "prot_id_6", "prot_id_7"),)
+
 
 # Now that we have defined the tables, we can create the tables in the
 # database.
@@ -357,9 +377,9 @@ Base.metadata.create_all(engine)
 
 # Open CSV file prot_data
 # Define path for all data files
-raw_dir = Path(__file__).resolve().parent.parent / "data" / "raw"
+raw_dir = Path(__file__).resolve().parent.parent / "data" / "raw" / "prot_info"
 # Define path to the prot_data file
-prot_data_file = raw_dir / "prot_data.csv"
+prot_data_file = raw_dir / "prot_data_minimal_correct.csv"
 
 mydata = []
 with open(prot_data_file, newline="") as csvfile:
@@ -378,7 +398,6 @@ session = Session()
 # and update the corresponding tables accordingly if they do not.
 # We can then update the linker tables by adding the corresponding items.
 for (
-    protid,
     protseq,
     NCBIid,
     uniprot,
@@ -403,13 +422,12 @@ for (
     pathid,
     KOid,
 ) in mydata:
-    # I removed prot so it is added automatically. Does it work that way?
 
     # Check what data is available:
-    print(protid, protseq, NCBIid)
+    print(protseq, NCBIid)
 
     # Check if protein already exists
-    prot = (
+    protein = (
         session.query(Protein)
         # .filter(Protein.prot_id == protid) So it is added automatically
         .filter(Protein.prot_seq == protseq)
@@ -418,133 +436,132 @@ for (
         # .filter(Protein.struct_prot_type == struct) It can be the same to others (is just the type: Hexamer, pentamer...)
         .first()
     )
-    if not prot:
-        prot = Protein(
+    if not protein:
+        protein = Protein(
             prot_seq=protseq,
             locus_NCBI_id=NCBIid,
             uniprot_id=uniprot,
             struct_prot_type=struct,
         )
-        session.add(prot)
+        session.add(protein)
         session.commit()
     else:
-        print(f"Protein with prot id {protid} and NCBI_id {NCBIid} already exist")
+        print(f"Protein with prot id XXXX and NCBI_id {NCBIid} already exist")
 
-    print(protid, protseq, NCBIid, uniprot, struct)
+    print(protseq, NCBIid, uniprot, struct)
 
     # Create a new gene object
-    existing_gene = (
+    gene = (
         session.query(Gene)
         # .filter(Gene.gen_id == genid) automatically assigned
         .filter(Gene.gen_name == name)
         # .filter(Gene.dna_seq == dnaseq) Do not matter if the dna seq is the same (same prot can have different names)
         .first()
     )
-    if not existing_gene:
-        new_gene = Gene(gen_name=name, dna_seq=dnaseq)
-        session.add(new_gene)
-        session.commit()
-
-        # Attempt to link this gene to the last protein added/
-        # attempted to be added to the database
-        try:
-            new_gene.protein.append(prot)
-            session.commit()
-            print(f"Added Gene {genid} to Protein {protid}")
-        except Exception as exc:
-            print(f"Error: {exc}")
-
-        #
-
+    # Ensure gene is not None before proceeding
+    if not gene:
+        gene = Gene(gen_name=name, dna_seq=dnaseq)
+        session.add(gene)
+        print(f"Gene {name} added")
     else:
         print(f"This gene name {name} has already being added to this gene ID {genid}")
 
-    print(genid, name, dnaseq)
-
-    # Create new tax
-    existing_tax = (
-        session.query(Taxonomy)
-        # .filter(Taxonomy.tax_id == taxid) ID automatically assigned
-        .filter(Taxonomy.tax_ref == taxref)
-        # .filter(Taxonomy.tax_db == taxdb) Same database for several references
-        # .filter(Taxonomy.species == spec)
-        # .filter(Taxonomy.genus == genu)
-        # .filter(Taxonomy.family == fam)
-        # .filter(Taxonomy.order_tax == order)
-        # .filter(Taxonomy.phylum == phyl)
-        # .filter(Taxonomy.class_tax == classt)
-        .filter(Taxonomy.strain == stra).first  # Strain should be unique no?
-    )
-    if not existing_tax:
-        new_tax = Taxonomy(
-            tax_ref=taxref,
-            ltax_db=taxdb,
-            species=spec,
-            genus=genu,
-            family=fam,
-            order_tax=order,
-            phylum=phyl,
-            class_tax=classt,
-            strain=stra,
-        )
-        session.add(new_tax)
-        session.commit()
-        if new_tax not in prot.taxon:
-            prot.taxon.append(new_tax)
-            session.commit()
-            print(f"Added Taxon {taxid} to Protein {protid}")
-        else:
-            print(f"Taxon {taxid} already associated with Protein {protid}")
+    if gene not in protein.genes:
+        protein.genes.append(gene)  # Add the gene to the protein's genes collection
+        try:
+                session.commit()  # Commit the changes
+                print(f"Linked Gene {gene.gen_id} to Protein {protein.prot_id}")
+        except IntegrityError as e:
+                session.rollback()
+                print(f"Error linking Gene {gene.gen_id} to Protein {protein.prot_id}: {e}")
     else:
-        print(f"This taxon has already being added {taxid, taxref}")
+        print(f"Gene {gene.gen_id} is already linked to Protein {protein.prot_id}")
+        print(genid, name, dnaseq)
 
-    print(taxid, taxref, taxdb, spec, genu, fam, order, phyl, classt, stra)
+    # # Create new tax
+    # existing_tax = (
+    #     session.query(Taxonomy)
+    #     # .filter(Taxonomy.tax_id == taxid) ID automatically assigned
+    #     .filter(Taxonomy.tax_ref == taxref)
+    #     # .filter(Taxonomy.tax_db == taxdb) Same database for several references
+    #     # .filter(Taxonomy.species == spec)
+    #     # .filter(Taxonomy.genus == genu)
+    #     # .filter(Taxonomy.family == fam)
+    #     # .filter(Taxonomy.order_tax == order)
+    #     # .filter(Taxonomy.phylum == phyl)
+    #     # .filter(Taxonomy.class_tax == classt)
+    #     .filter(Taxonomy.strain == stra).first  # Strain should be unique no?
+    # )
+    # if not existing_tax:
+    #     new_tax = Taxonomy(
+    #         tax_ref=taxref,
+    #         ltax_db=taxdb,
+    #         species=spec,
+    #         genus=genu,
+    #         family=fam,
+    #         order_tax=order,
+    #         phylum=phyl,
+    #         class_tax=classt,
+    #         strain=stra,
+    #     )
+    #     session.add(new_tax)
+    #     session.commit()
+    #     if new_tax not in prot.taxon:
+    #         prot.taxon.append(new_tax)
+    #         session.commit()
+    #         print(f"Added Taxon {taxid} to Protein {protid}")
+    #     else:
+    #         print(f"Taxon {taxid} already associated with Protein {protid}")
+    # else:
+    #     print(f"This taxon has already being added {taxid, taxref}")
 
-    # Create new pdb
-    existing_pdb = (
-        session.query(Pdb)
-        # .filter(Pdb.pdb_id == pdbid) Added automatically
-        .filter(Pdb.pdb_acc_1 == pdb_1)
-        .filter(Pdb.pdb_acc_2 == pdb_2)
-        .filter(Pdb.pdb_acc_3 == pdb_3)
-        .first
-    )
-    if not existing_pdb:
-        new_pdb = Pdb(pdb_acc_1=pdb_1, pdb_acc_2=pdb_2, pdb_acc_3=pdb_3)
-        session.add(new_pdb)
-        session.commit()
-        if new_pdb not in prot.pdb:
-            prot.pdb.append(new_pdb)
-            session.commit()
-            print(f"Added Pdb structure {pdbid} to Protein {protid}")
-        else:
-            print(f"Pdb structure {pdbid} already associated with Protein {protid}")
+    # print(taxid, taxref, taxdb, spec, genu, fam, order, phyl, classt, stra)
 
-    else:
-        print(f" This pdb entry already exist {pdbid}")
+    # # Create new pdb
+    # existing_pdb = (
+    #     session.query(Pdb)
+    #     # .filter(Pdb.pdb_id == pdbid) Added automatically
+    #     .filter(Pdb.pdb_acc_1 == pdb_1)
+    #     .filter(Pdb.pdb_acc_2 == pdb_2)
+    #     .filter(Pdb.pdb_acc_3 == pdb_3)
+    #     .first
+    # )
+    # if not existing_pdb:
+    #     new_pdb = Pdb(pdb_acc_1=pdb_1, pdb_acc_2=pdb_2, pdb_acc_3=pdb_3)
+    #     session.add(new_pdb)
+    #     session.commit()
+    #     if new_pdb not in prot.pdb:
+    #         prot.pdb.append(new_pdb)
+    #         session.commit()
+    #         print(f"Added Pdb structure {pdbid} to Protein {protid}")
+    #     else:
+    #         print(f"Pdb structure {pdbid} already associated with Protein {protid}")
 
-    print(pdbid, pdb_1, pdb_2, pdb_3)
+    # else:
+    #     print(f" This pdb entry already exist {pdbid}")
 
-    # Create new enzyme path
-    existing_path = (
-        session.query(Enzymepath)
-        # .filter(Enzymepath.path_id == pathid) Added automatically
-        .filter(Enzymepath.KO_ref == KOid).first
-    )
-    if not existing_path:
-        new_path = Enzymepath(KO_ref=KOid)
-        session.add(new_path)
-        session.commit()
-        if new_path not in prot.path:
-            prot.path.append(new_path)
-            session.commit()
-            print(f"Added EnzymePath {pathid} to Protein {protid}")
-        else:
-            print(f"EnzymePath {pathid} already associated with Protein {protid}")
-    else:
-        print(f"Existing gene ontology reference {KOid}")
+    # print(pdbid, pdb_1, pdb_2, pdb_3)
 
-    print(pathid, KOid)
+    # # Create new enzyme path
+    # existing_path = (
+    #     session.query(Enzymepath)
+    #     # .filter(Enzymepath.path_id == pathid) Added automatically
+    #     .filter(Enzymepath.KO_ref == KOid).first
+    # )
+    # if not existing_path:
+    #     new_path = Enzymepath(KO_ref=KOid)
+    #     session.add(new_path)
+    #     session.commit()
+    #     if new_path not in prot.path:
+    #         prot.path.append(new_path)
+    #         session.commit()
+    #         print(f"Added EnzymePath {pathid} to Protein {protid}")
+    #     else:
+    #         print(f"EnzymePath {pathid} already associated with Protein {protid}")
+    # else:
+    #     print(f"Existing gene ontology reference {KOid}")
+
+    # print(pathid, KOid)
 
 # # # Now we can query the database to see if the data has been added correctly
 # # # Unsure whether I understand this correctly
