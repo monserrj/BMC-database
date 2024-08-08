@@ -55,13 +55,13 @@ proteingene = Table(
     "protein_gene",  # This name will be used in SQLite
     Base.metadata,
     Column("prot_id", Integer, ForeignKey("protein.prot_id")),
-    Column("gen_id", Integer, ForeignKey("gene.gen_id")),
+    Column("gene_id", Integer, ForeignKey("gene.gene_id")),
     Column("name_rank", Integer),
     # To enforce unique combinations of protein, gene ID and rank
     # to ensure several names from a protein/gene are
     # not made principal
     UniqueConstraint(
-        "prot_id", "gen_id", "name_rank"
+        "prot_id", "gene_id", "name_rank"
     ),  # Remove table_args if not class
 )
 
@@ -181,8 +181,8 @@ class Gene(Base):
 
     __tablename__ = "gene"
 
-    gen_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
-    gen_name = Column(String, nullable=False)
+    gene_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
+    gene_name = Column(String, nullable=False)
     dna_seq = Column(String, nullable=False)
 
     # Define relationships after defining columns
@@ -398,30 +398,14 @@ session = Session()
 # and update the corresponding tables accordingly if they do not.
 # We can then update the linker tables by adding the corresponding items.
 for (
-    protseq,
-    NCBIid,
-    uniprot,
-    struct,
-    genid,
-    name,
-    dnaseq,
-    taxid,
-    taxref,
-    taxdb,
-    spec,
-    genu,
-    fam,
-    order,
-    phyl,
-    classt,
-    stra,
-    pdbid,
-    pdb_1,
-    pdb_2,
-    pdb_3,
+    protseq, NCBIid, uniprot, struct,
+    geneid, name, namerank, dnaseq,
+    taxid, taxref, taxdb, spec, genu, fam, order, phyl, classt, stra,
+    pdbid, pdb_1, pdb_2, pdb_3,
     pathid,
     KOid,
 ) in mydata:
+
 
     # Check what data is available:
     print(protseq, NCBIid)
@@ -453,30 +437,34 @@ for (
     # Create a new gene object
     gene = (
         session.query(Gene)
-        # .filter(Gene.gen_id == genid) automatically assigned
-        .filter(Gene.gen_name == name)
+        # .filter(Gene.gene_id == geneid) automatically assigned
+        .filter(Gene.gene_name == name)
         # .filter(Gene.dna_seq == dnaseq) Do not matter if the dna seq is the same (same prot can have different names)
         .first()
     )
     # Ensure gene is not None before proceeding
     if not gene:
-        gene = Gene(gen_name=name, dna_seq=dnaseq)
+        gene = Gene(gene_name=name, dna_seq=dnaseq)
         session.add(gene)
         print(f"Gene {name} added")
     else:
-        print(f"This gene name {name} has already being added to this gene ID {genid}")
-
+        print(f"This gene name {name} has already being added to this gene ID {geneid}")
+    print(protein.genes)
+    
     if gene not in protein.genes:
-        protein.genes.append(gene)  # Add the gene to the protein's genes collection
-        try:
-                session.commit()  # Commit the changes
-                print(f"Linked Gene {gene.gen_id} to Protein {protein.prot_id}")
-        except IntegrityError as e:
-                session.rollback()
-                print(f"Error linking Gene {gene.gen_id} to Protein {protein.prot_id}: {e}")
+        protein_gene = proteingene.insert().values(
+            prot_id=protein.prot_id,
+            gene_id=gene.gene_id,
+            name_rank=namerank
+        )
+        # protein.genes.append(gene)  # Add the gene to the protein's genes collection
+        # rank = proteingene(name_rank=namerank)
+        session.add(protein_gene)
+        session.commit()  # Commit the changes
+        print(f"Linked Gene {gene.gene_id} to Protein {protein.prot_id}")
     else:
-        print(f"Gene {gene.gen_id} is already linked to Protein {protein.prot_id}")
-        print(genid, name, dnaseq)
+        print(f"Gene {gene.gene_id} is already linked to Protein {protein.prot_id}")
+        print(geneid, name, dnaseq)
 
     # # Create new tax
     # existing_tax = (
