@@ -10,6 +10,8 @@ import csv
 # Import path to be able to open .csv files in different folders
 from pathlib import Path
 
+from typing import Optional
+
 # Import  SQLAlchemy classes needed with a declarative approach.
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import (
@@ -39,31 +41,43 @@ import sys
 # Create a base class to inherit from.
 Base = declarative_base()
 
+# Temporary code to delete local database while we debug
+# Path("bmc.db").unlink()
+
 # Create a database engine to connect to the database.
 # This creates a new empty database file called bmc.db in the current directory.
 engine = create_engine("sqlite:///bmc.db")
-
 
 # Create the tables in the database.
 # Tables with one-to-many and many-to-many relationships must be created
 # before creating other tables, to satisfy the logic of the code.
 
-
 # Need to create an unique constraint so protein_gene table field combinations
 # are always unique (only 1 priority name)
-proteingene = Table(
-    "protein_gene",  # This name will be used in SQLite
-    Base.metadata,
-    Column("prot_id", Integer, ForeignKey("protein.prot_id")),
-    Column("gene_id", Integer, ForeignKey("gene.gene_id")),
-    Column("name_rank", Integer),
-    # To enforce unique combinations of protein, gene ID and rank
-    # to ensure several names from a protein/gene are
-    # not made principal
-    UniqueConstraint(
-        "prot_id", "gene_id", "name_rank"
-    ),  # Remove table_args if not class
-)
+# proteingene = Table(
+#     "protein_gene",  # This name will be used in SQLite
+#     Base.metadata,
+#     Column("prot_id", Integer, ForeignKey("protein.prot_id")),
+#     Column("gene_id", Integer, ForeignKey("gene.gene_id")),
+#     Column("name_rank", Integer),
+#     # To enforce unique combinations of protein, gene ID and rank
+#     # to ensure several names from a protein/gene are
+#     # not made principal
+#     UniqueConstraint(
+#         "prot_id", "gene_id", "name_rank"
+#     ),  # Remove table_args if not class
+# )
+
+
+from sqlalchemy.orm import Mapped, mapped_column
+
+class ProteinGene(Base):
+    __tablename__ = "protein_gene"
+    protid: Mapped[int] = mapped_column(ForeignKey("protein.prot_id"), primary_key=True)
+    gene_id: Mapped[int] = mapped_column(ForeignKey("gene.gene_id"), primary_key=True)
+    name_rank: Mapped[Optional[int]]
+    gene: Mapped["Gene"] = relationship(back_populates="proteins")
+    protein: Mapped["Protein"] = relationship(back_populates="genes")
 
 proteintaxon = Table(
     "protein_taxon",
@@ -134,6 +148,7 @@ class Protein(Base):
     """
 
     __tablename__ = "protein"  # this is the name that will be used in SQLite
+    genes: Mapped[list["ProteinGene"]] = relationship()
 
     prot_id = Column(
         Integer, primary_key=True, autoincrement=True
@@ -146,9 +161,9 @@ class Protein(Base):
     # introduced, they information will be backpopulated to be consistant accross
     # all tables. Relationships must be introduced in both related tables (e.g.:
     # Gene and Protein, with relationship based on table Proteingene)
-    genes = relationship(
-        "Gene", secondary=proteingene, back_populates="proteins", lazy="dynamic"
-    )
+    # genes = relationship(
+    #     "Gene", secondary=proteingene, back_populates="proteins", lazy="dynamic"
+    # )
     taxons = relationship(
         "Taxonomy", secondary=proteintaxon, back_populates="proteins", lazy="dynamic"
     )
@@ -180,6 +195,7 @@ class Gene(Base):
     """
 
     __tablename__ = "gene"
+    proteins: Mapped[list["ProteinGene"]] = relationship()
 
     gene_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
     gene_name = Column(String, nullable=False)
@@ -187,9 +203,9 @@ class Gene(Base):
 
     # Define relationships after defining columns
     # A one-to-many relationship between Protein and Gene
-    proteins = relationship(
-        "Protein", secondary=proteingene, back_populates="genes", lazy="dynamic"
-    )
+    # proteins = relationship(
+    #     "Protein", secondary=proteingene, back_populates="genes", lazy="dynamic"
+    # )
 
 
 class Taxonomy(Base):
@@ -408,7 +424,7 @@ for (
 
 
     # Check what data is available:
-    print(protseq, NCBIid)
+    print(f"{protseq=}, {NCBIid=}")
 
     # Check if protein already exists
     protein = (
@@ -432,7 +448,7 @@ for (
     else:
         print(f"Protein with prot id XXXX and NCBI_id {NCBIid} already exist")
 
-    print(protseq, NCBIid, uniprot, struct)
+    print(f"{protseq=}, {NCBIid=}, {uniprot=}, {struct=}")
 
     # Create a new gene object
     gene = (
@@ -446,110 +462,120 @@ for (
     if not gene:
         gene = Gene(gene_name=name, dna_seq=dnaseq)
         session.add(gene)
-        print(f"Gene {name} added")
+        print(f"Gene {name=} added")
     else:
         print(f"This gene name {name} has already being added to this gene ID {geneid}")
-    print(protein.genes)
+    print(f"{protein.genes=}, {type(protein.genes)}")
+    # print(f"{protein.genes.first()=}, {protein.genes.all()=}")
     
-    if gene not in protein.genes:
-        protein_gene = proteingene.insert().values(
-            prot_id=protein.prot_id,
-            gene_id=gene.gene_id,
-            name_rank=namerank
-        )
-        # protein.genes.append(gene)  # Add the gene to the protein's genes collection
-        # rank = proteingene(name_rank=namerank)
-        session.add(protein_gene)
-        session.commit()  # Commit the changes
+    genes_associated_with_protein = protein.genes
+
+    if gene not in genes_associated_with_protein:
+        print(f"{protein.prot_id=}, {gene.gene_id=}, {namerank=}")
+        # protein_gene = proteingene.insert().values(
+        #     gene_id=gene.gene_id,
+        #     prot_id=protein.prot_id,
+        #     name_rank=namerank
+        # )
+        proteingene = ProteinGene(name_rank=int(namerank))
+        proteingene.gene = gene
+        print(f"{proteingene=}")
+        # # protein.genes.append(gene)  # Add the gene to the protein's genes collection
+        # # rank = proteingene(name_rank=namerank)
+        # session.add(protein_gene)
+        # session.commit()  # Commit the changes
+        protein.genes.append(proteingene)
         print(f"Linked Gene {gene.gene_id} to Protein {protein.prot_id}")
     else:
         print(f"Gene {gene.gene_id} is already linked to Protein {protein.prot_id}")
         print(geneid, name, dnaseq)
 
-    # # Create new tax
-    # existing_tax = (
-    #     session.query(Taxonomy)
-    #     # .filter(Taxonomy.tax_id == taxid) ID automatically assigned
-    #     .filter(Taxonomy.tax_ref == taxref)
-    #     # .filter(Taxonomy.tax_db == taxdb) Same database for several references
-    #     # .filter(Taxonomy.species == spec)
-    #     # .filter(Taxonomy.genus == genu)
-    #     # .filter(Taxonomy.family == fam)
-    #     # .filter(Taxonomy.order_tax == order)
-    #     # .filter(Taxonomy.phylum == phyl)
-    #     # .filter(Taxonomy.class_tax == classt)
-    #     .filter(Taxonomy.strain == stra).first  # Strain should be unique no?
-    # )
-    # if not existing_tax:
-    #     new_tax = Taxonomy(
-    #         tax_ref=taxref,
-    #         ltax_db=taxdb,
-    #         species=spec,
-    #         genus=genu,
-    #         family=fam,
-    #         order_tax=order,
-    #         phylum=phyl,
-    #         class_tax=classt,
-    #         strain=stra,
-    #     )
-    #     session.add(new_tax)
-    #     session.commit()
-    #     if new_tax not in prot.taxon:
-    #         prot.taxon.append(new_tax)
-    #         session.commit()
-    #         print(f"Added Taxon {taxid} to Protein {protid}")
-    #     else:
-    #         print(f"Taxon {taxid} already associated with Protein {protid}")
-    # else:
-    #     print(f"This taxon has already being added {taxid, taxref}")
+    continue  # Temporary skip of adding taxonomy data while we debug
 
-    # print(taxid, taxref, taxdb, spec, genu, fam, order, phyl, classt, stra)
+    # Create new tax
+    existing_tax = (
+        session.query(Taxonomy)
+        # .filter(Taxonomy.tax_id == taxid) ID automatically assigned
+        .filter(Taxonomy.tax_ref == taxref)
+        # .filter(Taxonomy.tax_db == taxdb) Same database for several references
+        # .filter(Taxonomy.species == spec)
+        # .filter(Taxonomy.genus == genu)
+        # .filter(Taxonomy.family == fam)
+        # .filter(Taxonomy.order_tax == order)
+        # .filter(Taxonomy.phylum == phyl)
+        # .filter(Taxonomy.class_tax == classt)
+        .filter(Taxonomy.strain == stra).first  # Strain should be unique no?
+    )
+    if not existing_tax:
+        new_tax = Taxonomy(
+            tax_ref=taxref,
+            ltax_db=taxdb,
+            species=spec,
+            genus=genu,
+            family=fam,
+            order_tax=order,
+            phylum=phyl,
+            class_tax=classt,
+            strain=stra,
+        )
+        session.add(new_tax)
+        session.commit()
+        if new_tax not in prot.taxon:
+            prot.taxon.append(new_tax)
+            session.commit()
+            print(f"Added Taxon {taxid} to Protein {protid}")
+        else:
+            print(f"Taxon {taxid} already associated with Protein {protid}")
+    else:
+        print(f"This taxon has already being added {taxid, taxref}")
 
-    # # Create new pdb
-    # existing_pdb = (
-    #     session.query(Pdb)
-    #     # .filter(Pdb.pdb_id == pdbid) Added automatically
-    #     .filter(Pdb.pdb_acc_1 == pdb_1)
-    #     .filter(Pdb.pdb_acc_2 == pdb_2)
-    #     .filter(Pdb.pdb_acc_3 == pdb_3)
-    #     .first
-    # )
-    # if not existing_pdb:
-    #     new_pdb = Pdb(pdb_acc_1=pdb_1, pdb_acc_2=pdb_2, pdb_acc_3=pdb_3)
-    #     session.add(new_pdb)
-    #     session.commit()
-    #     if new_pdb not in prot.pdb:
-    #         prot.pdb.append(new_pdb)
-    #         session.commit()
-    #         print(f"Added Pdb structure {pdbid} to Protein {protid}")
-    #     else:
-    #         print(f"Pdb structure {pdbid} already associated with Protein {protid}")
+    print(taxid, taxref, taxdb, spec, genu, fam, order, phyl, classt, stra)
 
-    # else:
-    #     print(f" This pdb entry already exist {pdbid}")
+    # Create new pdb
+    existing_pdb = (
+        session.query(Pdb)
+        # .filter(Pdb.pdb_id == pdbid) Added automatically
+        .filter(Pdb.pdb_acc_1 == pdb_1)
+        .filter(Pdb.pdb_acc_2 == pdb_2)
+        .filter(Pdb.pdb_acc_3 == pdb_3)
+        .first
+    )
+    if not existing_pdb:
+        new_pdb = Pdb(pdb_acc_1=pdb_1, pdb_acc_2=pdb_2, pdb_acc_3=pdb_3)
+        session.add(new_pdb)
+        session.commit()
+        if new_pdb not in prot.pdb:
+            prot.pdb.append(new_pdb)
+            session.commit()
+            print(f"Added Pdb structure {pdbid} to Protein {protid}")
+        else:
+            print(f"Pdb structure {pdbid} already associated with Protein {protid}")
 
-    # print(pdbid, pdb_1, pdb_2, pdb_3)
+    else:
+        print(f" This pdb entry already exist {pdbid}")
 
-    # # Create new enzyme path
-    # existing_path = (
-    #     session.query(Enzymepath)
-    #     # .filter(Enzymepath.path_id == pathid) Added automatically
-    #     .filter(Enzymepath.KO_ref == KOid).first
-    # )
-    # if not existing_path:
-    #     new_path = Enzymepath(KO_ref=KOid)
-    #     session.add(new_path)
-    #     session.commit()
-    #     if new_path not in prot.path:
-    #         prot.path.append(new_path)
-    #         session.commit()
-    #         print(f"Added EnzymePath {pathid} to Protein {protid}")
-    #     else:
-    #         print(f"EnzymePath {pathid} already associated with Protein {protid}")
-    # else:
-    #     print(f"Existing gene ontology reference {KOid}")
+    print(pdbid, pdb_1, pdb_2, pdb_3)
 
-    # print(pathid, KOid)
+    # Create new enzyme path
+    existing_path = (
+        session.query(Enzymepath)
+        # .filter(Enzymepath.path_id == pathid) Added automatically
+        .filter(Enzymepath.KO_ref == KOid).first
+    )
+    if not existing_path:
+        new_path = Enzymepath(KO_ref=KOid)
+        session.add(new_path)
+        session.commit()
+        if new_path not in prot.path:
+            prot.path.append(new_path)
+            session.commit()
+            print(f"Added EnzymePath {pathid} to Protein {protid}")
+        else:
+            print(f"EnzymePath {pathid} already associated with Protein {protid}")
+    else:
+        print(f"Existing gene ontology reference {KOid}")
+
+    print(pathid, KOid)
 
 # # # Now we can query the database to see if the data has been added correctly
 # # # Unsure whether I understand this correctly
