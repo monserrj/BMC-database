@@ -42,7 +42,7 @@ import sys
 Base = declarative_base()
 
 # Temporary code to delete local database while we debug
-# Path("bmc.db").unlink()
+Path("bmc.db").unlink()
 
 # Create a database engine to connect to the database.
 # This creates a new empty database file called bmc.db in the current directory.
@@ -155,7 +155,7 @@ class Protein(Base):
     )  # primary key column. Added autoincrement
     prot_seq = Column(String, nullable=False, unique=True)  # sequence string
     locus_NCBI_id = Column(String)
-    uniprot_id = Column(String)
+    uniprot_id = Column(String, unique=True)
     struct_prot_type = Column(Integer, nullable=True)
     # Introduce back_populates so when a relationship between different tables is
     # introduced, they information will be backpopulated to be consistant accross
@@ -395,7 +395,7 @@ Base.metadata.create_all(engine)
 # Define path for all data files
 raw_dir = Path(__file__).resolve().parent.parent / "data" / "raw" / "prot_info"
 # Define path to the prot_data file
-prot_data_file = raw_dir / "prot_data_minimal_correct.csv"
+prot_data_file = raw_dir / "prot_data_repeated_uniprot_stop.csv"
 
 mydata = []
 with open(prot_data_file, newline="") as csvfile:
@@ -424,7 +424,7 @@ for (
 
 
     # Check what data is available:
-    print(f"{protseq=}, {NCBIid=}")
+    print(f"This is before adding session.query {protseq=}, {NCBIid=},{uniprot=}, {struct=}")
 
     # Check if protein already exists
     protein = (
@@ -486,6 +486,8 @@ for (
         # session.commit()  # Commit the changes
         protein.genes.append(proteingene)
         print(f"Linked Gene {gene.gene_id} to Protein {protein.prot_id}")
+        print(f'{proteingene=}')
+        session.commit()
     else:
         print(f"Gene {gene.gene_id} is already linked to Protein {protein.prot_id}")
         print(geneid, name, dnaseq)
