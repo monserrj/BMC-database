@@ -71,6 +71,7 @@ engine = create_engine("sqlite:///bmc.db")
 
 from sqlalchemy.orm import Mapped, mapped_column
 
+
 class ProteinGene(Base):
     __tablename__ = "protein_gene"
     protid: Mapped[int] = mapped_column(ForeignKey("protein.prot_id"), primary_key=True)
@@ -78,6 +79,7 @@ class ProteinGene(Base):
     name_rank: Mapped[Optional[int]]
     gene: Mapped["Gene"] = relationship(back_populates="proteins")
     protein: Mapped["Protein"] = relationship(back_populates="genes")
+
 
 proteintaxon = Table(
     "protein_taxon",
@@ -186,6 +188,16 @@ class Protein(Base):
     #     "Protprotinteract",  secondary=proteincomplex, back_populates="proteins", lazy="dynamic"
     #     )
 
+    def __str__(self):
+        outstr = [
+            f"Protein ID: {self.prot_id}",
+            f"Protein sequence: {self.prot_seq}",
+            f"NCBI ID: {self.locus_NCBI_id}",
+            f"Uniprot ID: {self.uniprot_id}",
+            f"Protein structure type: {self.struct_prot_type}",
+        ]
+        return "\n".join(outstr)
+
 
 class Gene(Base):
     """Table representing a gene name and DNA sequence
@@ -197,7 +209,9 @@ class Gene(Base):
     __tablename__ = "gene"
     proteins: Mapped[list["ProteinGene"]] = relationship()
 
-    gene_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
+    gene_id = Column(
+        Integer, primary_key=True, autoincrement=True
+    )  # primary key column
     gene_name = Column(String, nullable=False)
     dna_seq = Column(String, nullable=False)
 
@@ -346,7 +360,7 @@ class Enzymepath(Base):
 #     # A many-to-many relationship between Protein and enzymatic activity
 #     proteins = relationship(
 #         "Protein", secondary=proteincomplex, back_populates="complexes", lazy="dynamic")
-    
+
 # # To enforce unique no repeated complexes are created
 #     __table_args__ = (UniqueConstraint("complex_id", "complex_type", "complex_activity", "assembly_exp_tested", "complex_source"),)
 
@@ -371,7 +385,7 @@ class Enzymepath(Base):
 #     # A many-to-many relationship between Protein and enzymatic activity
 #     proteins = relationship(
 #         "Protein", secondary=proteincomplex, back_populates="interacts", lazy="dynamic")
-    
+
 # # To enforce unique no repeated protein to protein interactions are created
 #     __table_args__ = (UniqueConstraint("prot_id_1", "prot_id_2", "prot_id_3", "prot_id_4", "prot_id_5", "prot_id_6", "prot_id_7"),)
 
@@ -414,83 +428,130 @@ session = Session()
 # and update the corresponding tables accordingly if they do not.
 # We can then update the linker tables by adding the corresponding items.
 for (
-    protseq, NCBIid, uniprot, struct,
-    geneid, name, namerank, dnaseq,
-    taxid, taxref, taxdb, spec, genu, fam, order, phyl, classt, stra,
-    pdbid, pdb_1, pdb_2, pdb_3,
+    protseq,
+    NCBIid,
+    uniprot,
+    struct,
+    geneid,
+    name,
+    namerank,
+    dnaseq,
+    taxid,
+    taxref,
+    taxdb,
+    spec,
+    genu,
+    fam,
+    order,
+    phyl,
+    classt,
+    stra,
+    pdbid,
+    pdb_1,
+    pdb_2,
+    pdb_3,
     pathid,
     KOid,
 ) in mydata:
-
-
     # Check what data is available:
-    print(f"This is before adding session.query {protseq=}, {NCBIid=},{uniprot=}, {struct=}")
-
-    # Check if protein already exists
-    protein = (
-        session.query(Protein)
-        # .filter(Protein.prot_id == protid) So it is added automatically
-        .filter(Protein.prot_seq == protseq)
-        .filter(Protein.locus_NCBI_id == NCBIid)
-        .filter(Protein.uniprot_id == uniprot)
-        # .filter(Protein.struct_prot_type == struct) It can be the same to others (is just the type: Hexamer, pentamer...)
-        .first()
+    print(
+        f"This is before adding session.query {protseq=}, {NCBIid=},{uniprot=}, {struct=}"
     )
-    if not protein:
-        protein = Protein(
-            prot_seq=protseq,
-            locus_NCBI_id=NCBIid,
-            uniprot_id=uniprot,
-            struct_prot_type=struct,
+
+    # 1. If the protein already exists, we store it in the `protein` variable
+    # 2. If the protein does not exist, we create a new protein object and add it to
+    #    the session
+    # 3. We then check if the gene already exists, and if so we store it in the `gene`
+    #    variable
+    # 4. If the gene does not exist, we create a new gene object and add it to the
+    #    session
+    # 5. We then check if the gene is already associated with the protein, and if not
+    #    we create a new `proteingene` object and add it to the session
+    # 6. We then commit the session to the database
+    ## NOTE: SQLAlchemy will autoflush the session when we query the database, so we
+    ##       do not need to manually flush the session before committing
+    ##       (https://docs.sqlalchemy.org/en/20/orm/session_basics.html#session-flushing)
+    ##       This will also automatically commit the session if no exceptions are
+    ##       raised but, if errors are raised, we will need to rollback the session
+    ##       and continue to the next entry.
+
+    try:
+        print(f"Before query, {protseq[:10]=}..., {NCBIid=}, {uniprot=}, {struct=}")
+        protein = (
+            session.query(Protein)
+            # .filter(Protein.prot_id == protid) So it is added automatically
+            .filter(Protein.prot_seq == protseq)
+            .filter(Protein.locus_NCBI_id == NCBIid)
+            .filter(Protein.uniprot_id == uniprot)
+            # .filter(Protein.struct_prot_type == struct) It can be the same to others (is just the type: Hexamer, pentamer...)
+            .first()
         )
-        session.add(protein)
+        print(f"After query, {protein=}")
+        if not protein:
+            protein = Protein(
+                prot_seq=protseq,
+                locus_NCBI_id=NCBIid,
+                uniprot_id=uniprot,
+                struct_prot_type=struct,
+            )
+            session.add(protein)
+        else:
+            print(f"Protein with prot id XXXX and NCBI_id {NCBIid} already exist")
+
+        print(f"{protseq=}, {NCBIid=}, {uniprot=}, {struct=}")
+
+        # Create a new gene object
+        print(f"Before query, {geneid=}, {name=}, {dnaseq=}")
+        gene = (
+            session.query(Gene)
+            # .filter(Gene.gene_id == geneid) automatically assigned
+            .filter(Gene.gene_name == name)
+            # .filter(Gene.dna_seq == dnaseq) Do not matter if the dna seq is the same (same prot can have different names)
+            .first()
+        )
+        # Ensure gene is not None before proceeding
+        if not gene:
+            gene = Gene(gene_name=name, dna_seq=dnaseq)
+            session.add(gene)
+            print(f"Gene {name=} added")
+        else:
+            print(
+                f"This gene name {name} has already being added to this gene ID {geneid}"
+            )
+        print(f"{protein.genes=}, {type(protein.genes)}")
+        # print(f"{protein.genes.first()=}, {protein.genes.all()=}")
+
+        genes_associated_with_protein = protein.genes
+
+        if gene not in genes_associated_with_protein:
+            print(f"{protein.prot_id=}, {gene.gene_id=}, {namerank=}")
+            # protein_gene = proteingene.insert().values(
+            #     gene_id=gene.gene_id,
+            #     prot_id=protein.prot_id,
+            #     name_rank=namerank
+            # )
+            proteingene = ProteinGene(name_rank=int(namerank))
+            proteingene.gene = gene
+            print(f"{proteingene=}")
+            # # protein.genes.append(gene)  # Add the gene to the protein's genes collection
+            # # rank = proteingene(name_rank=namerank)
+            # session.add(protein_gene)
+            # session.commit()  # Commit the changes
+            protein.genes.append(proteingene)
+            print(f"Linked Gene {gene.gene_id} to Protein {protein.prot_id}")
+            print(f"{proteingene=}")
+        else:
+            print(f"Gene {gene.gene_id} is already linked to Protein {protein.prot_id}")
+            print(geneid, name, dnaseq)
+
+        # Try to commit our changes
+        print("Committing changes")
         session.commit()
-    else:
-        print(f"Protein with prot id XXXX and NCBI_id {NCBIid} already exist")
-
-    print(f"{protseq=}, {NCBIid=}, {uniprot=}, {struct=}")
-
-    # Create a new gene object
-    gene = (
-        session.query(Gene)
-        # .filter(Gene.gene_id == geneid) automatically assigned
-        .filter(Gene.gene_name == name)
-        # .filter(Gene.dna_seq == dnaseq) Do not matter if the dna seq is the same (same prot can have different names)
-        .first()
-    )
-    # Ensure gene is not None before proceeding
-    if not gene:
-        gene = Gene(gene_name=name, dna_seq=dnaseq)
-        session.add(gene)
-        print(f"Gene {name=} added")
-    else:
-        print(f"This gene name {name} has already being added to this gene ID {geneid}")
-    print(f"{protein.genes=}, {type(protein.genes)}")
-    # print(f"{protein.genes.first()=}, {protein.genes.all()=}")
-    
-    genes_associated_with_protein = protein.genes
-
-    if gene not in genes_associated_with_protein:
-        print(f"{protein.prot_id=}, {gene.gene_id=}, {namerank=}")
-        # protein_gene = proteingene.insert().values(
-        #     gene_id=gene.gene_id,
-        #     prot_id=protein.prot_id,
-        #     name_rank=namerank
-        # )
-        proteingene = ProteinGene(name_rank=int(namerank))
-        proteingene.gene = gene
-        print(f"{proteingene=}")
-        # # protein.genes.append(gene)  # Add the gene to the protein's genes collection
-        # # rank = proteingene(name_rank=namerank)
-        # session.add(protein_gene)
-        # session.commit()  # Commit the changes
-        protein.genes.append(proteingene)
-        print(f"Linked Gene {gene.gene_id} to Protein {protein.prot_id}")
-        print(f'{proteingene=}')
-        session.commit()
-    else:
-        print(f"Gene {gene.gene_id} is already linked to Protein {protein.prot_id}")
-        print(geneid, name, dnaseq)
+    except Exception as exc:
+        print(f"Error committing protein/gene combination: {exc}")
+        print("Rolling back changes and skipping to next entry")
+        session.rollback()
+        # sys.exit()
 
     continue  # Temporary skip of adding taxonomy data while we debug
 
@@ -506,7 +567,8 @@ for (
         # .filter(Taxonomy.order_tax == order)
         # .filter(Taxonomy.phylum == phyl)
         # .filter(Taxonomy.class_tax == classt)
-        .filter(Taxonomy.strain == stra).first  # Strain should be unique no?
+        .filter(Taxonomy.strain == stra)
+        .first  # Strain should be unique no?
     )
     if not existing_tax:
         new_tax = Taxonomy(
@@ -562,7 +624,8 @@ for (
     existing_path = (
         session.query(Enzymepath)
         # .filter(Enzymepath.path_id == pathid) Added automatically
-        .filter(Enzymepath.KO_ref == KOid).first
+        .filter(Enzymepath.KO_ref == KOid)
+        .first
     )
     if not existing_path:
         new_path = Enzymepath(KO_ref=KOid)
