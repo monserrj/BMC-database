@@ -1,2 +1,2 @@
-sqlalchemy
+sqlalchemy=1.4.22
 sqlalchemy.orm
