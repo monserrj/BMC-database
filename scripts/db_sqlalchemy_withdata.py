@@ -464,16 +464,16 @@ def protein_gene_data_addition (protseq, NCBIid, uniprot, struct, name, namerank
         else:
             print(f"Protein with prot id XXXX and NCBI_id {NCBIid} already exist")
             
-        print(f"{protseq=}, {NCBIid=}, {uniprot=}, {struct=}")
+        print(f"{protseq[:10]=}, {NCBIid=}, {uniprot=}, {struct=}")
         
         # Create a new gene object
-        print(f"Before query, {name=}, {dnaseq=}")
+        print(f"Before query, {name=}, {dnaseq[:10]=}")
         gene = (
             session.query(Gene)
             # .filter(Gene.gene_id == geneid) automatically assigned
             .filter(Gene.gene_name == name)
-            # .filter(Gene.dna_seq == dnaseq) Do not matter if the dna seq is the same (same prot can have different names)
-            .first()
+            .filter(Gene.dna_seq == dnaseq)
+            .all() # I want both conditions to be meet for it not to added, I don't care if the gene name is the same if the seuqence is different and viceversa
         )
         # Add gene if it is not already present
         if not gene:
@@ -483,7 +483,7 @@ def protein_gene_data_addition (protseq, NCBIid, uniprot, struct, name, namerank
             print(f"Gene {name=} added")
         else:
             print(
-                f"This gene name {name} has already being added to this gene ID {geneid}"
+                f"This gene name {name} has already being added"
             )
         print(f"{protein.genes=}, {type(protein.genes)}")
         # print(f"{protein.genes.first()=}, {protein.genes.all()=}")
@@ -502,7 +502,7 @@ def protein_gene_data_addition (protseq, NCBIid, uniprot, struct, name, namerank
             
         else:
             print(f"Gene {gene.gene_id} is already linked to Protein {protein.prot_id}")
-            print(name, dnaseq)
+            print(f"{name}, {dnaseq [:10]=}")
         
         # Try to commit our changes
         print("Committing changes")
@@ -519,7 +519,7 @@ def protein_gene_data_addition (protseq, NCBIid, uniprot, struct, name, namerank
 # Define path for data file directory
 raw_dir = Path(__file__).resolve().parent.parent / "data" / "raw" / "prot_info" / "incorrect_gene"
 # Define path to the data file
-prot_data_file = raw_dir / "prot_data_gene_repeated_full_stop.csv"
+prot_data_file = raw_dir / "prot_data_gene_repeated_geneseq.csv"
 
 mydata = []
 with open(prot_data_file, newline="") as csvfile:
@@ -559,6 +559,8 @@ for (
     
     # Check what data is available:
     print(f"This is before adding session.query {protseq=}, {NCBIid=},{uniprot=}, {struct=}")
+    
+    # Add protein-gene data
     protein_gene_data_addition(
         protseq=protseq,
         NCBIid=NCBIid,
