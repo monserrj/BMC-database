@@ -51,27 +51,7 @@ engine = create_engine("sqlite:///bmc.db")
 # Create the tables in the database.
 # Tables with one-to-many and many-to-many relationships must be created
 # before creating other tables, to satisfy the logic of the code.
-
-# Need to create an unique constraint so protein_gene table field combinations
-# are always unique (only 1 priority name)
-# proteingene = Table(
-#     "protein_gene",  # This name will be used in SQLite
-#     Base.metadata,
-#     Column("prot_id", Integer, ForeignKey("protein.prot_id")),
-#     Column("gene_id", Integer, ForeignKey("gene.gene_id")),
-#     Column("name_rank", Integer),
-#     # To enforce unique combinations of protein, gene ID and rank
-#     # to ensure several names from a protein/gene are
-#     # not made principal
-#     UniqueConstraint(
-#         "prot_id", "gene_id", "name_rank"
-#     ),  # Remove table_args if not class
-# )
-
-
 from sqlalchemy.orm import Mapped, mapped_column
-
-
 class ProteinGene(Base):
     __tablename__ = "protein_gene"
     prot_id: Mapped[int] = mapped_column(ForeignKey("protein.prot_id"), primary_key=True)
@@ -80,14 +60,15 @@ class ProteinGene(Base):
     gene: Mapped["Gene"] = relationship(back_populates="proteins")
     protein: Mapped["Protein"] = relationship(back_populates="genes")
 
-
-proteintaxon = Table(
-    "protein_taxon",
-    Base.metadata,
-    Column("prot_id", Integer, ForeignKey("protein.prot_id")),
-    Column("tax_id", Integer, ForeignKey("taxon.tax_id")),
+ 
+class ProteinTaxonomy (Base):
+    __tablename__ = "protein_taxonomy"
+    prot_id : Mapped[int] = mapped_column(ForeignKey("protein.prot_id"), primary_key=True)
+    tax_id : Mapped[int] = mapped_column(ForeignKey("taxonomy.tax_id"), primary_key=True)
+    
+    taxonomy: Mapped["Taxonomy"] = relationship(back_populates="proteins")
+    protein: Mapped["Protein"] = relationship(back_populates="taxonomies")
     UniqueConstraint("prot_id", "tax_id"),
-)
 
 proteinpdb = Table(
     "protein_pdb",
@@ -151,6 +132,7 @@ class Protein(Base):
 
     __tablename__ = "protein"  # this is the name that will be used in SQLite
     genes: Mapped[list["ProteinGene"]] = relationship()
+    taxonomies: Mapped[list["ProteinTaxonomy"]] = relationship()
 
     prot_id = Column(
         Integer, primary_key=True, autoincrement=True
@@ -159,6 +141,7 @@ class Protein(Base):
     locus_NCBI_id = Column(String,unique=True, nullable=True)
     uniprot_id = Column(String, unique=True, nullable=True)
     struct_prot_type = Column(Integer, nullable=True)
+    
     # Introduce back_populates so when a relationship between different tables is
     # introduced, they information will be backpopulated to be consistant accross
     # all tables. Relationships must be introduced in both related tables (e.g.:
@@ -166,9 +149,9 @@ class Protein(Base):
     # genes = relationship(
     #     "Gene", secondary=proteingene, back_populates="proteins", lazy="dynamic"
     # )
-    taxons = relationship(
-        "Taxonomy", secondary=proteintaxon, back_populates="proteins", lazy="dynamic"
-    )
+    # taxons = relationship(
+    #     "Taxonomy", secondary=proteintaxon, back_populates="proteins", lazy="dynamic"
+    # )
     pdbs = relationship(
         "Pdb", secondary=proteinpdb, back_populates="proteins", lazy="dynamic"
     )
@@ -201,39 +184,38 @@ class Protein(Base):
 
 class Gene(Base):
     """Table representing a gene name and DNA sequence
-
     Each gene_ID represents a gene name and sequences. Several name strings
     given to an unique sequence
     """
-
+    
     __tablename__ = "gene"
     proteins: Mapped[list["ProteinGene"]] = relationship()
-
+    
     gene_id = Column(
         Integer, primary_key=True, autoincrement=True
     )  # primary key column
     gene_name = Column(String, nullable=False)
     dna_seq = Column(String, nullable=False)
-
-    # Define relationships after defining columns
-    # A one-to-many relationship between Protein and Gene
-    # proteins = relationship(
-    #     "Protein", secondary=proteingene, back_populates="genes", lazy="dynamic"
-    # )
-
-
+    
 class Taxonomy(Base):
     """Table representing the taxon accession of a protein
-
     This table will store the taxon origin of the protein sequence, e.g.:
     specie, genus, family... and a accession number to a database with details
     about that organism
     """
-
-    __tablename__ = "taxon"
-    tax_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
-    tax_ref = Column(String, unique=True, nullable=False)  # accession number in db
-    tax_db = Column(String, nullable=False)  # Name of database used (e.g.: NCBI, GTDB)
+    
+    __tablename__ = "taxonomy"
+    proteins: Mapped[list["ProteinTaxonomy"]] = relationship()
+    
+    tax_id = Column(
+        Integer, primary_key=True, autoincrement=True
+    )  # primary key column
+    tax_ref = Column(
+        String, unique=True, nullable=False
+    )  # accession number in db
+    tax_db = Column(
+        String, nullable=False
+    )  # Name of database used (e.g.: NCBI, GTDB)
     species = Column(String, nullable=False)
     genus = Column(String)
     family = Column(String)
@@ -241,14 +223,9 @@ class Taxonomy(Base):
     phylum = Column(String)
     class_tax = Column(String)
     strain = Column(String)
-
-    # A many-to-one relationship between Protein and Taxonomy
-    proteins = relationship(
-        "Protein", secondary=proteintaxon, back_populates="taxons", lazy="dynamic"
-    )
-
-    # To enforce unique taxon references
+    # To enforce unique taxonomy references
     __table_args__ = (UniqueConstraint("tax_id", "tax_ref"),)
+    __table_args__ = (UniqueConstraint("species", "strain"),)
 
 
 class Pdb(Base):
@@ -410,7 +387,7 @@ session = Session()
 
 # Making a function for the addition of data to protein, gene and protein_gene tables:
 def protein_gene_data_addition (protseq, NCBIid, uniprot, struct, name, namerank, dnaseq): 
-    #Args:
+    # Args:
     # protseq (str): Protein sequence.
     # NCBIid (str): NCBI locus ID.
     # uniprot (str): UniProt ID.
@@ -462,7 +439,7 @@ def protein_gene_data_addition (protseq, NCBIid, uniprot, struct, name, namerank
             session.add(protein)
             session.flush () # This sends the changes to the database, so prot_id is assigned
         else:
-            print(f"Protein with prot id XXXX and NCBI_id {NCBIid} already exist")
+            print(f"Protein with prot id XXXX and NCBI_id {NCBIid} already exists")
             
         print(f"{protseq[:10]=}, {NCBIid=}, {uniprot=}, {struct=}")
         
@@ -485,13 +462,14 @@ def protein_gene_data_addition (protseq, NCBIid, uniprot, struct, name, namerank
             print(
                 f"This gene name {name} has already being added"
             )
+        
+        # Associate the gene and protein information in the protein_gene table
         print(f"{protein.genes=}, {type(protein.genes)}")
         # print(f"{protein.genes.first()=}, {protein.genes.all()=}")
         
-        # Associate the gene and protein information in the protein_gene table
-        genes_associated_with_protein = protein.genes
+        gene_associated_with_protein = protein.genes
         
-        if gene not in genes_associated_with_protein:
+        if gene not in gene_associated_with_protein:
             print(f"{protein.prot_id=}, {gene.gene_id=}, {namerank=}")
             proteingene = ProteinGene(name_rank=int(namerank))
             proteingene.gene = gene
@@ -512,14 +490,93 @@ def protein_gene_data_addition (protseq, NCBIid, uniprot, struct, name, namerank
         print(f"Error committing protein/gene combination: {exc}")
         print("Rolling back changes and skipping to next entry")
         session.rollback()
-        # Rollback makes it that when there is a "fail", like not unique uniprot reference, its "forgets" the error and keeps going.
-        # sys.exit()
+        # Rollback makes it that when there is a "fail", 
+        # like not unique uniprot reference, its "forgets" the error and keeps going.
+
+# Making a function for the addition of data to tax and prot_tax tables:
+def taxonomy_data_addition (taxref, taxdb, spec, genu, fam, order, phyl, classt, stra):
+    # Args:
+    # taxref (str): Taxonomy reference ID
+    # taxdb (str): Taxonomy database used for reference ID
+    # spec (str): Specie (taxonomy classification)
+    # genu (str): Genus (taxonomy classification)
+    # fam (str): Family (taxonomy classification)
+    # order (str): Order (taxonomy classification)
+    # phyl (str): Phylogeny (taxonomy classification)
+    # classt (str): Class (taxonomy classification)
+    # stra (str): Strain (taxonomy classification)
+    
+    # Explanation on how the code works:
+    # 1. We check if the taxonomy already exists, and if so we store it in the `tax`
+    #    variable
+    # 2. If the taxonomy does not exist, we create a new gene object and add it to the
+    #    session
+    # 3. We then check if the taxonomy is already associated with the protein being added, and if not
+    #    we create a new `proteintax` object and add it to the session
+    # 4. We then commit the session to the database
+    
+    try:
+        print(f"Before query, {taxref=}, {taxdb=}, {spec=}, {genu=}, {fam=}, {order=}, {phyl=}, {classt=}, {stra=}")
+        # Create a new taxonomy object
+        taxonomy = (
+            session.query(Taxonomy)
+            .filter(Taxonomy.tax_ref == taxref)
+            .filter(Taxonomy.strain == stra) # Strain should be unique no?
+            .first()
+        )
+        print(f"After query, {taxonomy=}")
+        # Add taxonomy if it is not already present
+        if not taxonomy:
+            taxonomy = Taxonomy(
+                tax_ref=taxref,
+                tax_db=taxdb,
+                species=spec,
+                genus=genu,
+                family=fam,
+                order_tax=order,
+                phylum=phyl,
+                class_tax=classt,
+                strain=stra,
+            )
+            session.add(taxonomy)
+            session.flush()
+        else:
+            print(f"This taxonomy {taxref} already exists")
+            
+        print(f"{taxref=}, {taxdb=}, {spec=}, {genu=}, {fam=}, {order=}, {phyl=}, {classt=}, {stra=}")
+        
+        # Associate the taxonomy with the protein information in the protein_tax table
+        print(f"{taxonomy.proteins=}, {type(taxonomy.proteins)}")
+        
+        taxonomy_associated_with_protein = taxonomy.proteins
+        if taxonomy not in taxonomy_associated_with_protein:
+            print(f"{protein.prot_id=}, {taxonomy.tax_id=}")
+            proteintaxonomy = ProteinTaxonomy()
+            proteintaxonomy.taxonomy = taxonomy
+            # proteintaxonomy.prot_id = protein
+            print(f"{proteintaxonomy=}")
+            taxonomy.proteins.append(proteintaxonomy)
+            print(f"Linked Taxonomy {taxonomy.tax_id} to Protein {protein.prot_id}")
+            print(f"{proteintaxonomy=}")
+        else:
+            print(f"Taxonomy {taxonomy.tax_id} is already linked to Protein {protein.prot_id}")
+            print(f"{taxref}, {spec}, {stra}")
+        
+        # Try to commit our changes;
+        print("Committing changes")
+        session.commit()
+        
+    except Exception as exc:
+        print(f"Error committing protein/gene combination: {exc}")
+        print("Rolling back changes and skipping to next entry")
+        session.rollback()
+
 
 # Open the csv file
 # Define path for data file directory
-raw_dir = Path(__file__).resolve().parent.parent / "data" / "raw" / "prot_info" / "incorrect_gene"
+raw_dir = Path(__file__).resolve().parent.parent / "data" / "raw" / "prot_info"
 # Define path to the data file
-prot_data_file = raw_dir / "prot_data_gene_repeated_geneseq.csv"
+prot_data_file = raw_dir / "prot_data_minimal_correct.csv"
 
 mydata = []
 with open(prot_data_file, newline="") as csvfile:
@@ -539,7 +596,6 @@ for (
     name,
     namerank,
     dnaseq,
-    taxid,
     taxref,
     taxdb,
     spec,
@@ -570,47 +626,20 @@ for (
         dnaseq=dnaseq,
         namerank=namerank
     )
+    
+    # Add taxonomy data
+    taxonomy_data_addition(
+        taxref=taxref,
+        taxdb = taxdb,
+        spec = spec,
+        genu = genu,
+        fam = fam,
+        order = order,
+        phyl = phyl,
+        classt = classt,
+        stra = stra
+    )
 
-
-# # Create new tax
-# existing_tax = (
-#     session.query(Taxonomy)
-#     # .filter(Taxonomy.tax_id == taxid) ID automatically assigned
-#     .filter(Taxonomy.tax_ref == taxref)
-#     # .filter(Taxonomy.tax_db == taxdb) Same database for several references
-#     # .filter(Taxonomy.species == spec)
-#     # .filter(Taxonomy.genus == genu)
-#     # .filter(Taxonomy.family == fam)
-#     # .filter(Taxonomy.order_tax == order)
-#     # .filter(Taxonomy.phylum == phyl)
-#     # .filter(Taxonomy.class_tax == classt)
-#     .filter(Taxonomy.strain == stra)
-#     .first  # Strain should be unique no?
-# )
-# if not existing_tax:
-#     new_tax = Taxonomy(
-#         tax_ref=taxref,
-#         ltax_db=taxdb,
-#         species=spec,
-#         genus=genu,
-#         family=fam,
-#         order_tax=order,
-#         phylum=phyl,
-#         class_tax=classt,
-#         strain=stra,
-#     )
-#     session.add(new_tax)
-#     session.commit()
-#     if new_tax not in prot.taxon:
-#         prot.taxon.append(new_tax)
-#         session.commit()
-#         print(f"Added Taxon {taxid} to Protein {protid}")
-#     else:
-#         print(f"Taxon {taxid} already associated with Protein {protid}")
-# else:
-#     print(f"This taxon has already being added {taxid, taxref}")
-
-# print(taxid, taxref, taxdb, spec, genu, fam, order, phyl, classt, stra)
 
 # # Create new pdb
 # existing_pdb = (
