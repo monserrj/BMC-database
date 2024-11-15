@@ -52,6 +52,8 @@ engine = create_engine("sqlite:///bmc.db")
 # Tables with one-to-many and many-to-many relationships must be created
 # before creating other tables, to satisfy the logic of the code.
 from sqlalchemy.orm import Mapped, mapped_column
+
+
 class ProteinGene(Base):
     __tablename__ = "protein_gene"
     prot_id: Mapped[int] = mapped_column(ForeignKey("protein.prot_id"), primary_key=True)
@@ -366,25 +368,6 @@ class Enzymepath(Base):
 # # To enforce unique no repeated protein to protein interactions are created
 #     __table_args__ = (UniqueConstraint("prot_id_1", "prot_id_2", "prot_id_3", "prot_id_4", "prot_id_5", "prot_id_6", "prot_id_7"),)
 
-
-# Now that we have defined the tables, we can create the tables in the
-# database.
-Base.metadata.create_all(engine)
-
-# Add some data to populate the database.
-# Function for each data type addition created
-# Add the data to the database in a loop, but we'll have to
-# check if the data entered already exist
-# and update the corresponding tables accordingly.
-# We need to check if the sequence, structure, and accession already exist,
-# and update the corresponding tables accordingly if they do not.
-# We can then update the linker tables by adding the corresponding items.
-
-# Start the session
-Session = sessionmaker()  # we also need a session object
-Session.configure(bind=engine)
-session = Session()
-
 # Making a function for the addition of data to protein, gene and protein_gene tables:
 def protein_gene_data_addition (protseq, NCBIid, uniprot, struct, name, namerank, dnaseq): 
     # Args:
@@ -571,130 +554,150 @@ def taxonomy_data_addition (taxref, taxdb, spec, genu, fam, order, phyl, classt,
         print("Rolling back changes and skipping to next entry")
         session.rollback()
 
+# Script below here
+if __name__ == "__main__":
 
-# Open the csv file
-# Define path for data file directory
-raw_dir = Path(__file__).resolve().parent.parent / "data" / "raw" / "prot_info"
-# Define path to the data file
-prot_data_file = raw_dir / "prot_data_minimal_correct.csv"
+    # Now that we have defined the tables, we can create the tables in the
+    # database.
+    Base.metadata.create_all(engine)
 
-mydata = []
-with open(prot_data_file, newline="") as csvfile:
-    reader = csv.reader(csvfile)
-    next(reader)  # Skip header row
-    for row in reader:
-        # Convert empty strings to Null
-        row = [None if val == "" else val for val in row]
-        mydata.append(tuple(row))
+    # Add some data to populate the database.
+    # Function for each data type addition created
+    # Add the data to the database in a loop, but we'll have to
+    # check if the data entered already exist
+    # and update the corresponding tables accordingly.
+    # We need to check if the sequence, structure, and accession already exist,
+    # and update the corresponding tables accordingly if they do not.
+    # We can then update the linker tables by adding the corresponding items.
 
-# Add the data to the database
-for (
-    protseq,
-    NCBIid,
-    uniprot,
-    struct,
-    name,
-    namerank,
-    dnaseq,
-    taxref,
-    taxdb,
-    spec,
-    genu,
-    fam,
-    order,
-    phyl,
-    classt,
-    stra,
-    pdbid,
-    pdb_1,
-    pdb_2,
-    pdb_3,
-    pathid,
-    KOid,
-) in mydata:
-    
-    # Check what data is available:
-    print(f"This is before adding session.query {protseq=}, {NCBIid=},{uniprot=}, {struct=}")
-    
-    # Add protein-gene data
-    protein_gene_data_addition(
-        protseq=protseq,
-        NCBIid=NCBIid,
-        uniprot=uniprot,
-        struct=struct,
-        name=name,
-        dnaseq=dnaseq,
-        namerank=namerank
-    )
-    
-    # Add taxonomy data
-    taxonomy_data_addition(
-        taxref=taxref,
-        taxdb = taxdb,
-        spec = spec,
-        genu = genu,
-        fam = fam,
-        order = order,
-        phyl = phyl,
-        classt = classt,
-        stra = stra
-    )
+    # Start the session
+    Session = sessionmaker()  # we also need a session object
+    Session.configure(bind=engine)
+    session = Session()
+
+    # Open the csv file
+    # Define path for data file directory
+    raw_dir = Path(__file__).resolve().parent.parent / "data" / "raw" / "prot_info"
+    # Define path to the data file
+    prot_data_file = raw_dir / "prot_data_minimal_correct.csv"
+
+    mydata = []
+    with open(prot_data_file, newline="") as csvfile:
+        reader = csv.reader(csvfile)
+        next(reader)  # Skip header row
+        for row in reader:
+            # Convert empty strings to Null
+            row = [None if val == "" else val for val in row]
+            mydata.append(tuple(row))
+
+    # Add the data to the database
+    for (
+        protseq,
+        NCBIid,
+        uniprot,
+        struct,
+        name,
+        namerank,
+        dnaseq,
+        taxref,
+        taxdb,
+        spec,
+        genu,
+        fam,
+        order,
+        phyl,
+        classt,
+        stra,
+        pdbid,
+        pdb_1,
+        pdb_2,
+        pdb_3,
+        pathid,
+        KOid,
+    ) in mydata:
+        
+        # Check what data is available:
+        print(f"This is before adding session.query {protseq=}, {NCBIid=},{uniprot=}, {struct=}")
+        
+        # Add protein-gene data
+        protein_gene_data_addition(
+            protseq=protseq,
+            NCBIid=NCBIid,
+            uniprot=uniprot,
+            struct=struct,
+            name=name,
+            dnaseq=dnaseq,
+            namerank=namerank
+        )
+        
+        # Add taxonomy data
+        taxonomy_data_addition(
+            taxref=taxref,
+            taxdb = taxdb,
+            spec = spec,
+            genu = genu,
+            fam = fam,
+            order = order,
+            phyl = phyl,
+            classt = classt,
+            stra = stra
+        )
 
 
-# # Create new pdb
-# existing_pdb = (
-#     session.query(Pdb)
-#     # .filter(Pdb.pdb_id == pdbid) Added automatically
-#     .filter(Pdb.pdb_acc_1 == pdb_1)
-#     .filter(Pdb.pdb_acc_2 == pdb_2)
-#     .filter(Pdb.pdb_acc_3 == pdb_3)
-#     .first
-# )
-# if not existing_pdb:
-#     new_pdb = Pdb(pdb_acc_1=pdb_1, pdb_acc_2=pdb_2, pdb_acc_3=pdb_3)
-#     session.add(new_pdb)
-#     session.commit()
-#     if new_pdb not in prot.pdb:
-#         prot.pdb.append(new_pdb)
-#         session.commit()
-#         print(f"Added Pdb structure {pdbid} to Protein {protid}")
-#     else:
-#         print(f"Pdb structure {pdbid} already associated with Protein {protid}")
+    # # Create new pdb
+    # existing_pdb = (
+    #     session.query(Pdb)
+    #     # .filter(Pdb.pdb_id == pdbid) Added automatically
+    #     .filter(Pdb.pdb_acc_1 == pdb_1)
+    #     .filter(Pdb.pdb_acc_2 == pdb_2)
+    #     .filter(Pdb.pdb_acc_3 == pdb_3)
+    #     .first
+    # )
+    # if not existing_pdb:
+    #     new_pdb = Pdb(pdb_acc_1=pdb_1, pdb_acc_2=pdb_2, pdb_acc_3=pdb_3)
+    #     session.add(new_pdb)
+    #     session.commit()
+    #     if new_pdb not in prot.pdb:
+    #         prot.pdb.append(new_pdb)
+    #         session.commit()
+    #         print(f"Added Pdb structure {pdbid} to Protein {protid}")
+    #     else:
+    #         print(f"Pdb structure {pdbid} already associated with Protein {protid}")
 
-# else:
-#     print(f" This pdb entry already exist {pdbid}")
+    # else:
+    #     print(f" This pdb entry already exist {pdbid}")
 
-# print(pdbid, pdb_1, pdb_2, pdb_3)
+    # print(pdbid, pdb_1, pdb_2, pdb_3)
 
-# # Create new enzyme path
-# existing_path = (
-#     session.query(Enzymepath)
-#     # .filter(Enzymepath.path_id == pathid) Added automatically
-#     .filter(Enzymepath.KO_ref == KOid)
-#     .first
-# )
-# if not existing_path:
-#     new_path = Enzymepath(KO_ref=KOid)
-#     session.add(new_path)
-#     session.commit()
-#     if new_path not in prot.path:
-#         prot.path.append(new_path)
-#         session.commit()
-#         print(f"Added EnzymePath {pathid} to Protein {protid}")
-#     else:
-#         print(f"EnzymePath {pathid} already associated with Protein {protid}")
-# else:
-#     print(f"Existing gene ontology reference {KOid}")
+    # # Create new enzyme path
+    # existing_path = (
+    #     session.query(Enzymepath)
+    #     # .filter(Enzymepath.path_id == pathid) Added automatically
+    #     .filter(Enzymepath.KO_ref == KOid)
+    #     .first
+    # )
+    # if not existing_path:
+    #     new_path = Enzymepath(KO_ref=KOid)
+    #     session.add(new_path)
+    #     session.commit()
+    #     if new_path not in prot.path:
+    #         prot.path.append(new_path)
+    #         session.commit()
+    #         print(f"Added EnzymePath {pathid} to Protein {protid}")
+    #     else:
+    #         print(f"EnzymePath {pathid} already associated with Protein {protid}")
+    # else:
+    #     print(f"Existing gene ontology reference {KOid}")
 
-# print(pathid, KOid)
+    # print(pathid, KOid)
 
-# # # Now we can query the database to see if the data has been added correctly
-# # # Unsure whether I understand this correctly
-# # for protein in session.query(Protein):
-# #     print(f"\nPROTEIN: {protein.prot_id}")
-# #     print("PROTEIN AND GENES:")
-# #     for gen in protein.protein_gene:
-# #         print(f"\t{gen.gen_id}, {gen.prot_id}")
-# #     print("GENES:")
-# #     for gene in protein.gene:
-# #         print(f"\t{gene.gen_seq}, {gene.gen_id}, {gene.gen_name}")
+    # # # Now we can query the database to see if the data has been added correctly
+    # # # Unsure whether I understand this correctly
+    # # for protein in session.query(Protein):
+    # #     print(f"\nPROTEIN: {protein.prot_id}")
+    # #     print("PROTEIN AND GENES:")
+    # #     for gen in protein.protein_gene:
+    # #         print(f"\t{gen.gen_id}, {gen.prot_id}")
+    # #     print("GENES:")
+    # #     for gene in protein.gene:
+    # #         print(f"\t{gene.gen_seq}, {gene.gen_id}, {gene.gen_name}")
