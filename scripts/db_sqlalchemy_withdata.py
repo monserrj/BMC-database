@@ -53,58 +53,54 @@ engine = create_engine("sqlite:///bmc.db")
 # before creating other tables, to satisfy the logic of the code.
 from sqlalchemy.orm import Mapped, mapped_column
 
-
-class ProteinGene(Base):
-    __tablename__ = "protein_gene"
+class ProteinName(Base):
+    __tablename__ = "protein_name"
     prot_id: Mapped[int] = mapped_column(ForeignKey("protein.prot_id"), primary_key=True)
-    gene_id: Mapped[int] = mapped_column(ForeignKey("gene.gene_id"), primary_key=True)
+    name_id: Mapped[int] = mapped_column(ForeignKey("name.name_id")) # Not primary key as can be repeated
     name_rank: Mapped[Optional[int]]
-    gene: Mapped["Gene"] = relationship(back_populates="proteins")
-    protein: Mapped["Protein"] = relationship(back_populates="genes")
-
- 
+    name: Mapped["Name"] = relationship(back_populates="proteins")
+    protein: Mapped["Protein"] = relationship(back_populates="names")
 class ProteinTaxonomy (Base):
     __tablename__ = "protein_taxonomy"
     prot_id : Mapped[int] = mapped_column(ForeignKey("protein.prot_id"), primary_key=True)
     tax_id : Mapped[int] = mapped_column(ForeignKey("taxonomy.tax_id"))
     taxonomy: Mapped["Taxonomy"] = relationship(back_populates="proteins")
     protein: Mapped["Protein"] = relationship(back_populates="taxonomies")
-    UniqueConstraint("prot_id", "tax_id"),
-
-proteinpdb = Table(
-    "protein_pdb",
-    Base.metadata,
-    Column("prot_id", Integer, ForeignKey("protein.prot_id")),
-    Column("pdb_id", Integer, ForeignKey("pdb.pdb_id")),
-)
-
-proteindomain = Table(
-    "protein_domain",
-    Base.metadata,
-    Column("prot_id", Integer, ForeignKey("protein.prot_id")),
-    Column("dom_id", Integer, ForeignKey("domain.dom_id")),
-)
-
-isoforms = Table(
-    "isoforms",
-    Base.metadata,
-    Column("canonical_prot_id", Integer, ForeignKey("protein.prot_id")),
-    Column("isoform_prot_id", Integer, ForeignKey("protein.prot_id")),
-)
-
-proteinGO = Table(
-    "protein_GO",
-    Base.metadata,
-    Column("prot_id", Integer, ForeignKey("protein.prot_id")),
-    Column("go_id", Integer, ForeignKey("function.go_id")),
-)
-
-proteinpath = Table(
-    "protein_path",
-    Base.metadata,
-    Column("prot_id", Integer, ForeignKey("protein.prot_id")),
-    Column("path_id", Integer, ForeignKey("enzymepath.path_id")),
-)
+    UniqueConstraint("prot_id", "tax_id")
+class ProteinPdb (Base):
+    __tablename__ = "protein_pdb"
+    prot_id : Mapped[int] = mapped_column(ForeignKey("protein.prot_id"), primary_key=True)
+    pdb_id : Mapped[int] = mapped_column(ForeignKey("pdb.pdb_id")) # Recheck if this is primary key too
+    pdb : Mapped["Pdb"] = relationship(back_populates="proteins") 
+    protein: Mapped["Protein"] = relationship(back_populates="pdbs")
+    UniqueConstraint("prot_id", "pdb_id")
+class ProteinDomain (Base):
+    __tablename__ = "protein_domain"
+    prot_id : Mapped[int] = mapped_column(ForeignKey("protein.prot_id"), primary_key=True)
+    dom_id : Mapped[int] = mapped_column(ForeignKey("domain.dom_id"))
+    domain : Mapped["Domain"] = relationship(back_populates="proteins") 
+    protein: Mapped["Protein"] = relationship(back_populates="domains")
+    UniqueConstraint("prot_id", "dom_id")
+# class Isoforms (Base):
+#     __tablename__ = "isoforms"
+#     canonical__prot_id : Mapped[int] = mapped_column(ForeignKey("protein.prot_id"), primary_key=True)
+#     isoform__prot_id : Mapped[int] = mapped_column(ForeignKey("protein.prot_id"), primary_key=True)
+#     isoform : Mapped["Protein"] = relationship(back_populates="isoforms") 
+#     canonical: Mapped["Protein"] = relationship(back_populates="canonicals") # Recheck this
+class ProteinFunction (Base):
+    __tablename__ = "protein_function"
+    prot_id : Mapped[int] = mapped_column(ForeignKey("protein.prot_id"), primary_key=True)
+    go_id : Mapped[int] = mapped_column(ForeignKey("function.go_id"))
+    function : Mapped["Function"] = relationship(back_populates="proteins") 
+    protein: Mapped["Protein"] = relationship(back_populates="functions")
+    UniqueConstraint("prot_id", "go_id")
+class ProteinPath (Base):
+    __tablename__ = "protein_path"
+    prot_id : Mapped[int] = mapped_column(ForeignKey("protein.prot_id"), primary_key=True)
+    path_id : Mapped[int] = mapped_column(ForeignKey("enzyme_path.path_id"))
+    path : Mapped["EnzymePath"] = relationship(back_populates="proteins") 
+    protein: Mapped["Protein"] = relationship(back_populates="paths")
+    UniqueConstraint("prot_id", "path_id")
 
 # proteincomplex = Table(
 #      "protein_complex",
@@ -122,56 +118,47 @@ proteinpath = Table(
 # this gets done after the tables are created.
 # Each class inherits from the Base class we created earlier.
 class Protein(Base):
+    
     """Table representing a protein
-
     This table will store the protein sequence, links to accessions
     in other databases, and links to the type of protein structure.
-
     The protein sequence is taken to be unique, so we'll add a
     UniqueConstraint to the table to enforce this.
     """
-
     __tablename__ = "protein"  # this is the name that will be used in SQLite
-    genes: Mapped[list["ProteinGene"]] = relationship()
+    
+    # Introduce all relationship between tables:
+    names: Mapped[list["ProteinName"]] = relationship()
     taxonomies: Mapped[list["ProteinTaxonomy"]] = relationship()
-
+    pdbs: Mapped[list["ProteinPdb"]] = relationship()
+    domains: Mapped[list["ProteinDomain"]] = relationship()
+    # isoforms: Mapped[list["Isoforms"]] = relationship()
+    # canonicals: Mapped[list["Isoforms"]] = relationship() # I am sure this is wrong, fix when TS
+    functions: Mapped[list["ProteinFunction"]] = relationship()
+    paths: Mapped[list["ProteinPath"]] = relationship()
+    
+    # Define table content:
     prot_id = Column(
         Integer, primary_key=True, autoincrement=True
-    )  # primary key column. Added autoincrement
-    prot_seq = Column(String, nullable=False, unique=True)  # sequence string
+        )  
+    prot_seq = Column(String, nullable=False, unique=True)
     locus_NCBI_id = Column(String,unique=True, nullable=True)
     uniprot_id = Column(String, unique=True, nullable=True)
     struct_prot_type = Column(Integer, nullable=True)
+    dna_seq = Column(String, nullable=False) # New addition for testing Name instead of gen table
     
     # Introduce back_populates so when a relationship between different tables is
-    # introduced, they information will be backpopulated to be consistant accross
+    # introduced, they information will be back-populated to be consistent across
     # all tables. Relationships must be introduced in both related tables (e.g.:
-    # Gene and Protein, with relationship based on table Proteingene)
-    # genes = relationship(
-    #     "Gene", secondary=proteingene, back_populates="proteins", lazy="dynamic"
-    # )
-    # taxons = relationship(
-    #     "Taxonomy", secondary=proteintaxon, back_populates="proteins", lazy="dynamic"
-    # )
-    pdbs = relationship(
-        "Pdb", secondary=proteinpdb, back_populates="proteins", lazy="dynamic"
-    )
-    domains = relationship(
-        "Domain", secondary=proteindomain, back_populates="proteins", lazy="dynamic"
-    )
-    functions = relationship(
-        "Function", secondary=proteinGO, back_populates="proteins", lazy="dynamic"
-    )
-    paths = relationship(
-        "Enzymepath", secondary=proteinpath, back_populates="proteins", lazy="dynamic"
-    )
+    # Gene and Protein, with relationship based on table ProteinGene)
     # complexes = relationship(
     #     "Complex", secondary=proteincomplex, back_populates="proteins", lazy="dynamic"
     #     )
     # interacts = relationship(
     #     "Protprotinteract",  secondary=proteincomplex, back_populates="proteins", lazy="dynamic"
     #     )
-
+    
+    # Define type of output for protein
     def __str__(self):
         outstr = [
             f"Protein ID: {self.prot_id}",
@@ -179,26 +166,32 @@ class Protein(Base):
             f"NCBI ID: {self.locus_NCBI_id}",
             f"Uniprot ID: {self.uniprot_id}",
             f"Protein structure type: {self.struct_prot_type}",
+            f"DNA sequence: {self.dna_seq}",
         ]
         return "\n".join(outstr)
 
 
-class Gene(Base):
-    """Table representing a gene name and DNA sequence
-    Each gene_ID represents a gene name and sequences. Several name strings
-    given to an unique sequence
+class Name(Base):
+    
+    """Table representing a gene name
+    Each gene_ID represents a gene name. Several name strings
+    given to an unique protein, and several proteins sharing same name
     """
     
-    __tablename__ = "gene"
-    proteins: Mapped[list["ProteinGene"]] = relationship()
+    __tablename__ = "name"
     
-    gene_id = Column(
+    # Introduce all relationship between tables:
+    proteins: Mapped[list["ProteinName"]] = relationship()
+    
+    # Define table content:
+    name_id = Column(
         Integer, primary_key=True, autoincrement=True
-    )  # primary key column
+        )  # primary key column
     gene_name = Column(String, nullable=False)
-    dna_seq = Column(String, nullable=False)
-    
+    # dna_seq = Column(String, nullable=False) removed as it will be part of the protein identity
+
 class Taxonomy(Base):
+    
     """Table representing the taxon accession of a protein
     This table will store the taxon origin of the protein sequence, e.g.:
     specie, genus, family... and a accession number to a database with details
@@ -206,8 +199,11 @@ class Taxonomy(Base):
     """
     
     __tablename__ = "taxonomy"
+    
+    # Introduce all relationship between tables:
     proteins: Mapped[list["ProteinTaxonomy"]] = relationship()
     
+    # Define table content:
     tax_id = Column(
         Integer, primary_key=True, autoincrement=True
     )  # primary key column
@@ -224,96 +220,95 @@ class Taxonomy(Base):
     phylum = Column(String)
     class_tax = Column(String)
     strain = Column(String)
+    
     # To enforce unique taxonomy references
     __table_args__ = (UniqueConstraint("tax_id", "tax_ref"),)
     __table_args__ = (UniqueConstraint("species", "strain"),)
 
 
 class Pdb(Base):
+    
     """Table representing the Pdb accession of a protein
-
     This table will store the different pdb accession number that represent the
     structure of a protein
     """
-
+    
     __tablename__ = "pdb"
+    
+    # Introduce all relationship between tables:
+    proteins: Mapped[list["ProteinPdb"]] = relationship()
+    
+    # Define table content:
     pdb_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
     pdb_acc_1 = Column(String, unique=True)  # primary accession number in pdb
     pdb_acc_2 = Column(String, nullable=False)  # accession number
     pdb_acc_3 = Column(String, nullable=False)  # accession number
 
-    # A one-to-many relationship between Protein and Pdb structure
-    proteins = relationship(
-        "Protein", secondary=proteinpdb, back_populates="pdbs", lazy="dynamic"
-    )
-
-
 class Domain(Base):
     """Table representing the conserved domain family of a protein
-
     This table will store the different conserved domain accession number that represent the
     structure of a protein, including the reference database where the accession number
     was taken
     """
-
+    
     __tablename__ = "domain"
+    
+    # Introduce all relationship between tables:
+    proteins: Mapped[list["ProteinDomain"]] = relationship()
+    
+    # Define table content:
     dom_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
     dom_ref = Column(
         String, unique=True, nullable=False
     )  # domain accession in external db
     dom_db = Column(Integer, nullable=False)  # external database name e.g. pfam, CDD
-
-    # A many-to-many relationship between Protein and domain family
-    proteins = relationship(
-        "Protein", secondary=proteindomain, back_populates="domains", lazy="dynamic"
-    )
-
+    
     # To enforce unique domain family references
     __table_args__ = (UniqueConstraint("dom_id", "dom_ref"),)
 
 
 class Function(Base):
     """Table representing a function of a protein
-
     This table will store the different Gene Ontology accession numbers, type and
     description of the function.
     The types can be MF (molecular function), CC (cellular compartment),
     or BP (biological process)
     """
-
+    
     __tablename__ = "function"
+    
+    # Introduce all relationship between tables:
+    proteins: Mapped[list["ProteinFunction"]] = relationship()
+    
+    # Define table content:
     go_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
     go_ref = Column(String, unique=True, nullable=False)  # accession number in GO
     go_type = Column(String, nullable=False)  # GO type (MF,CC,BP)
     go_description = Column(String, nullable=False)  # text description of function
-
-    # A many-to-many relationship between Protein and function
-    proteins = relationship(
-        "Protein", secondary=proteinGO, back_populates="functions", lazy="dynamic"
-    )
+    
     # To enforce unique function references
     __table_args__ = (UniqueConstraint("go_id", "go_ref"),)
 
 
-class Enzymepath(Base):
+class EnzymePath(Base):
     """Table representing the enzymatic reaction in which the protein
     participates
-
-    This table will store the different Kegg Ontlogy accession numbers
+    This table will store the different Kegg Ontology accession numbers
     related wit an specific function of a protein. Thus, a protein can have
     more than one reference
     """
-
-    __tablename__ = "enzymepath"
+    
+    __tablename__ = "enzyme_path"
+    
+    # Introduce all relationship between tables:
+    proteins: Mapped[list["ProteinPath"]] = relationship()
+    
+    # Define table content:
     path_id = Column(
         Integer, primary_key=True, autoincrement=True
     )  # primary key column
     KO_ref = Column(String, unique=True, nullable=False)  # accession number in KO
-
-    # A many-to-many relationship between Protein and enzymatic activity
-    proteins = relationship(
-        "Protein", secondary=proteinpath, back_populates="paths", lazy="dynamic"
-    )
+    
     # To enforce unique enzymatic pathway references
     __table_args__ = (UniqueConstraint("path_id", "KO_ref"),)
 
@@ -367,28 +362,25 @@ class Enzymepath(Base):
 # # To enforce unique no repeated protein to protein interactions are created
 #     __table_args__ = (UniqueConstraint("prot_id_1", "prot_id_2", "prot_id_3", "prot_id_4", "prot_id_5", "prot_id_6", "prot_id_7"),)
 
-# Making a function for the addition of data to protein, gene and protein_gene tables:
-def protein_gene_data_addition (session, protseq, NCBIid, uniprot, struct, name, namerank, dnaseq): 
+
+
+
+# Making a function for the addition of data to the different tables:
+
+# Function for protein data addition
+def protein_addition (session, protseq, NCBIid, uniprot, struct, dnaseq): 
     # Args:
     # protseq (str): Protein sequence.
     # NCBIid (str): NCBI locus ID.
     # uniprot (str): UniProt ID.
     # struct (str): Protein structure type.
-    # name (str): Gene name.
     # dnaseq (str): Gene DNA sequence.
-    # namerank (int): Rank of the gene name associated with the protein.
     
     # Explanation on how the code works:
-    # 1. If the protein already exists, we store it in the `protein` variable
-    # 2. If the protein does not exist, we create a new protein object and add it to
+    # 1. If the protein already exists, store it in the `protein` variable
+    # 2. If the protein does not exist, create a new protein object and add it to
     #    the session
-    # 3. We then check if the gene already exists, and if so we store it in the `gene`
-    #    variable
-    # 4. If the gene does not exist, we create a new gene object and add it to the
-    #    session
-    # 5. We then check if the gene is already associated with the protein, and if not
-    #    we create a new `proteingene` object and add it to the session
-    # 6. We then commit the session to the database
+    # 3. Commit the session to the database
     
     ## NOTE: SQLAlchemy will autoflush the session when we query the database, so we
     ##       do not need to manually flush the session before committing
@@ -396,22 +388,24 @@ def protein_gene_data_addition (session, protseq, NCBIid, uniprot, struct, name,
     ##       This will also automatically commit the session if no exceptions are
     ##       raised but, if errors are raised, we will need to rollback the session
     ##       and continue to the next entry.
-    print(f"\nNow in {protein_gene_data_addition.__name__}")
-
-    ## (2) LP: This could be refactored into a function, called from here
+    
+    print(f"\nNow in {protein_addition.__name__}")
+    
     try:
-        print(f"Before query, {protseq[:10]=}..., {NCBIid=}, {uniprot=}, {struct=}")
+        print(f"Before query, {protseq[:10]=}..., {NCBIid=}, {uniprot=}, {struct=}, {dnaseq[:10]=}")
+        
         # Create a new protein object
         protein = (
             session.query(Protein)
-            # .filter(Protein.prot_id == protid) So it is added automatically
+            # Prot_id added automatically
             .filter(Protein.prot_seq == protseq)
             .filter(Protein.locus_NCBI_id == NCBIid)
             .filter(Protein.uniprot_id == uniprot)
-            # .filter(Protein.struct_prot_type == struct) It can be the same to others (is just the type: Hexamer, pentamer...)
+            # Protein struct is just the type (e.g.: hexamer), will be repeated
             .first()
         )
         print(f"After query, {protein=}")
+        
         # Add protein if it is not already present
         if not protein:
             protein = Protein(
@@ -419,6 +413,7 @@ def protein_gene_data_addition (session, protseq, NCBIid, uniprot, struct, name,
                 locus_NCBI_id=NCBIid,
                 uniprot_id=uniprot,
                 struct_prot_type=struct,
+                dna_seq=dnaseq,
             )
             session.add(protein)
             session.flush () # This sends the changes to the database, so prot_id is assigned
@@ -426,71 +421,101 @@ def protein_gene_data_addition (session, protseq, NCBIid, uniprot, struct, name,
             print(f"Protein with prot id XXXX and NCBI_id {NCBIid} already exists")
             
         print(f"Protein row returned: {protein}")
-        #print(f"{protseq[:10]=}, {NCBIid=}, {uniprot=}, {struct=}")
-        ## (2)
         
-        ## (3) LP: This could be refactored into a function, called from here
-        # Create a new gene object
-        print(f"Before query, {name=}, {dnaseq[:10]=}")
-        gene = (
-            session.query(Gene)
-            # .filter(Gene.gene_id == geneid) automatically assigned
-            .filter(Gene.gene_name == name)
-            .filter(Gene.dna_seq == dnaseq)
-            .all() # I want both conditions to be meet for it not to added, I don't care if the gene name is the same if the seuqence is different and viceversa
-        )
-        # Add gene if it is not already present
-        if not gene:
-            gene = Gene(gene_name=name, dna_seq=dnaseq)
-            session.add(gene)
-            session.flush ()
-            print(f"Gene {name=} added")
-        else:
-            print(
-                f"This gene name {name} has already being added"
-            )
-        print(f"Gene row returned: {gene}")
-        ## (3)
-
-        ## (4) LP: Could refactor this to a function, called from here
-        # Associate the gene and protein information in the protein_gene table
-        print(f"{protein.genes=}, {type(protein.genes)}")
-        # print(f"{protein.genes.first()=}, {protein.genes.all()=}")
-        
-        gene_associated_with_protein = protein.genes  # LP: could avoid assigning this
-        
-        if gene not in gene_associated_with_protein:
-            print(f"{protein.prot_id=}, {gene.gene_id=}, {namerank=}")
-            proteingene = ProteinGene(name_rank=int(namerank))
-            proteingene.gene = gene
-            # print(f"{proteingene=}")
-            print(f"{protein.genes=}")
-            protein.genes.append(proteingene)
-            print(f"{protein.genes=}")
-            print(f"Linked Gene {gene.gene_id} to Protein {protein.prot_id}")
-            print(f"{proteingene=}")
-            
-        else:
-            print(f"Gene {gene.gene_id} is already linked to Protein {protein.prot_id}")
-            print(f"{name}, {dnaseq [:10]=}")
-        print(f"Linked gene from protein: {proteingene.gene}")
-        ## (4)
-
         # Try to commit our changes
         print("Committing changes")
         session.commit()
         
     except Exception as exc:
         print(f"Error committing protein/gene combination: {exc}")
-        print("Rolling back changes and skipping to next entry")
+        print("Rolling back changes and skipping to next entry\n")
         session.rollback()
         # Rollback makes it that when there is a "fail", 
         # like not unique uniprot reference, its "forgets" the error and keeps going.
-
+    
     return protein  # Return the protein row we just added to the db/otherwise dealt with
 
-# Making a function for the addition of data to tax and prot_tax tables:
-def taxonomy_data_addition (session, taxref, taxdb, spec, genu, fam, order, phyl, classt, stra, protein):
+# Function for name data addition
+def name_addition (session, genename, namerank, protein): 
+    # Args:
+    # name (str): Gene name.
+    # namerank (int): Rank of the gene name associated with the protein.
+    # protein: Protein information added with protein_addition function
+    
+    # Explanation on how the code works:
+    # 1. Check if the name already exists,  store it in the `name` variable
+    # 2. If the name does not exist, create a new name object and add it to the
+    #    session
+    # 3. Check if the name is already associated with the protein, and if not
+    #    create a new `proteinname` object and add it to the session
+    # 4. Commit the session to the database
+    
+    print(f"\nNow in {name_addition.__name__}")
+    
+    with session.no_autoflush:
+        try:
+            print(f"Before query, {genename=}")
+            
+            # Create a new name object
+            name = (
+                session.query(Name)
+                # name_id automatically assigned
+                .filter(Name.gene_name == genename)
+                .all()
+            )
+            print(f"After query, {name=}")
+            
+            # Add name if it is not already present
+            if not name:
+                name = Name(gene_name=genename)
+                session.add(name)
+                session.flush ()
+                print(f"Name {genename=} added")
+            else:
+                print(
+                    f"This gene name {genename} has already being added"
+                )
+            print(f"Name row returned: {name}")
+            
+            # Associate the gene name and protein information in the protein_gene table
+            # Leighton suggested to make a specific function only for merged tables,
+            # I think I want them linked because if I add a gene I want the information
+            # instantly available for my protein and linked. need to double check with LP
+            print(f"{name.proteins=}, {type(name.proteins)}")
+            
+            if name not in name.proteins:
+                print(f"{protein.prot_id=}, {name.name_id=}, {namerank=}")
+                proteinname = ProteinName(name_rank=int(namerank))
+                # Name rank in there as is a new addition to the proteinname table
+                # not in name or protein
+                print(f"{name.proteins=}")
+                proteinname.name = name
+                print(f"{proteinname=}")
+                print(f"{name.proteins=}")
+                protein.names.append(proteinname)
+                print(f"{name.proteins=}")
+                print(f"\nLinked Gene name {name.name_id} to Protein {protein.prot_id}")
+                print(f"{proteinname=}")
+            else:
+                print(f"Gene name {name.name_id} is already linked to Protein {protein.prot_id}")
+                print(f"{name}")
+            # print(f"Linked gene from protein: {proteingene.gene}")
+            
+            # Try to commit our changes
+            print("Committing changes")
+            session.commit()
+            
+        except Exception as exc:
+            print(f"Error committing protein/gene combination: {exc}")
+            print("Rolling back changes and skipping to next entry")
+            session.rollback()
+            # Rollback makes it that when there is a "fail", 
+            # like not unique uniprot reference, its "forgets" the error and keeps going.
+            
+        return name  # Return the gene row we just added to the db/otherwise dealt with
+
+# Function for taxonomy data addition:
+def taxonomy_addition (session, taxref, taxdb, spec, genu, fam, order, phyl, classt, stra, protein):
     # Args:
     # taxref (str): Taxonomy reference ID
     # taxdb (str): Taxonomy database used for reference ID
@@ -501,24 +526,27 @@ def taxonomy_data_addition (session, taxref, taxdb, spec, genu, fam, order, phyl
     # phyl (str): Phylogeny (taxonomy classification)
     # classt (str): Class (taxonomy classification)
     # stra (str): Strain (taxonomy classification)
+    # protein: Protein information added with protein_addition function
     
     # Explanation on how the code works:
-    # 1. We check if the taxonomy already exists, and if so we store it in the `tax`
+    # 1. Check if the taxonomy already exists, and if so store it in the `tax`
     #    variable
-    # 2. If the taxonomy does not exist, we create a new gene object and add it to the
+    # 2. If the taxonomy does not exist, create a new gene object and add it to the
     #    session
-    # 3. We then check if the taxonomy is already associated with the protein being added, and if not
-    #    we create a new `proteintax` object and add it to the session
-    # 4. We then commit the session to the database
-    print(f"\nNow in {taxonomy_data_addition.__name__}")
-
+    # 3. Then check if the taxonomy is already associated with the protein being added, and if not
+    #    create a new `proteintax` object and add it to the session
+    # 4. Commit the session to the database
+    
+    print(f"\nNow in {taxonomy_addition.__name__}")
+    
     # LP: Had to turn off autoflushing to suppress an error here
     # See https://github.com/sqlalchemy/sqlalchemy/discussions/12049=
     with session.no_autoflush:
-
+        
         try:
             ## (5) LP: Could refactor this to a function, called from here
             print(f"Before query, {taxref=}, {taxdb=}, {spec=}, {genu=}, {fam=}, {order=}, {phyl=}, {classt=}, {stra=}")
+            
             # Create a new taxonomy object
             taxonomy = (
                 session.query(Taxonomy)
@@ -527,6 +555,7 @@ def taxonomy_data_addition (session, taxref, taxdb, spec, genu, fam, order, phyl
                 .first()
             )
             print(f"After query, {taxonomy=}")
+            
             # Add taxonomy if it is not already present
             if not taxonomy:
                 taxonomy = Taxonomy(
@@ -542,25 +571,23 @@ def taxonomy_data_addition (session, taxref, taxdb, spec, genu, fam, order, phyl
                 )
                 session.add(taxonomy)
                 session.flush()
+                print(f"Taxonomy {taxref=} added")
             else:
                 print(f"This taxonomy {taxref} already exists")
                 
-            print(f"{taxref=}, {taxdb=}, {spec=}, {genu=}, {fam=}, {order=}, {phyl=}, {classt=}, {stra=}")
             print(f"Taxonomy row returned: {taxonomy}")
+            print(f"{taxref=}, {taxdb=}, {spec=}, {genu=}, {fam=}, {order=}, {phyl=}, {classt=}, {stra=}")
+            
             ## (5)
             
-            # print(f"{taxonomy.proteins=}")
-
             # Associate the taxonomy with the protein information in the protein_tax table
             print(f"{taxonomy.proteins=}, {type(taxonomy.proteins)}")
-
-            taxonomy_associated_with_protein = taxonomy.proteins  # LP don't need to assign
-            if taxonomy not in taxonomy_associated_with_protein:
+            
+            if taxonomy not in taxonomy.proteins:
                 print(f"{protein.prot_id=}, {taxonomy.tax_id=}")
                 proteintaxonomy = ProteinTaxonomy()
                 print(f"{taxonomy.proteins=}")
                 proteintaxonomy.taxonomy = taxonomy
-                # proteintaxonomy.prot_id = protein
                 print(f"{proteintaxonomy=}")
                 print(f"{taxonomy.proteins=}")
                 #taxonomy.proteins.append(proteintaxonomy)
@@ -580,6 +607,9 @@ def taxonomy_data_addition (session, taxref, taxdb, spec, genu, fam, order, phyl
             print(f"Error committing protein/gene combination: {exc}")
             print("Rolling back changes and skipping to next entry")
             session.rollback()
+        return taxonomy # Return the taxonomy row we just added to the db/otherwise dealt with
+
+
 
 # Script below here
 if __name__ == "__main__":
@@ -625,7 +655,7 @@ if __name__ == "__main__":
         NCBIid,
         uniprot,
         struct,
-        name,
+        genename,
         namerank,
         dnaseq,
         taxref,
@@ -646,23 +676,32 @@ if __name__ == "__main__":
     ) in mydata:
         
         # Check what data is available:
-        print(f"This is before adding session.query {protseq=}, {NCBIid=},{uniprot=}, {struct=}")
+        # print(f"This is before adding session.query {protseq=}, {NCBIid=},{uniprot=}, {struct=}")
         
-        # Add protein-gene data
-        protein = protein_gene_data_addition(
+        # Add protein data
+        protein = protein_addition(
             session,
             protseq=protseq,
             NCBIid=NCBIid,
             uniprot=uniprot,
             struct=struct,
-            name=name,
             dnaseq=dnaseq,
-            namerank=namerank
         )
-        print(f"Protein record returned: {protein}")
+        print(f"\nProtein record returned: {protein}")
+        
+        # Add name data
+        name = name_addition(
+            session,
+            genename=genename,
+            namerank=namerank,
+            protein = protein
+        )
+        
+        print(f"\nProtein record returned: {protein}")
+        print(f"Name record returned: {name}")
         
         # Add taxonomy data
-        taxonomy_data_addition(
+        taxonomy = taxonomy_addition(
             session,
             taxref=taxref,
             taxdb = taxdb,
@@ -675,6 +714,9 @@ if __name__ == "__main__":
             stra = stra,
             protein = protein
         )
+        print(f"\nProtein record returned: {protein}")
+        print(f"Name record returned: {name}")
+        print(f"Taxonomy record returned: {taxonomy}")
 
 
     # # Create new pdb
