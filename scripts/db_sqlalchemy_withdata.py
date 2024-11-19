@@ -60,6 +60,7 @@ class ProteinName(Base):
     name_rank: Mapped[Optional[int]]
     name: Mapped["Name"] = relationship(back_populates="proteins")
     protein: Mapped["Protein"] = relationship(back_populates="names")
+    UniqueConstraint("prot_id", "name_id", "name_rank")
 class ProteinTaxonomy (Base):
     __tablename__ = "protein_taxonomy"
     prot_id : Mapped[int] = mapped_column(ForeignKey("protein.prot_id"), primary_key=True)
