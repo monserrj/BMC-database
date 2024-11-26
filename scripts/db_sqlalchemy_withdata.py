@@ -146,7 +146,7 @@ class Protein(Base):
     locus_NCBI_id = Column(String,unique=True, nullable=True)
     uniprot_id = Column(String, unique=True, nullable=True)
     struct_prot_type = Column(Integer, nullable=True)
-    dna_seq = Column(String, nullable=False) # New addition for testing Name instead of gen table
+    dna_seq = Column(String, nullable=False, unique=True) # New addition for testing Name instead of gen table
     
     # Introduce back_populates so when a relationship between different tables is
     # introduced, they information will be back-populated to be consistent across
@@ -223,7 +223,6 @@ class Taxonomy(Base):
     strain = Column(String)
     
     # To enforce unique taxonomy references
-    __table_args__ = (UniqueConstraint("tax_id", "tax_ref"),)
     __table_args__ = (UniqueConstraint("species", "strain"),)
 
 
@@ -462,7 +461,7 @@ def name_addition (session, genename, namerank, protein):
                 session.query(Name)
                 # name_id automatically assigned
                 .filter(Name.gene_name == genename)
-                .all()
+                .first()
             )
             print(f"After query, {name=}")
             
@@ -552,7 +551,6 @@ def taxonomy_addition (session, taxref, taxdb, spec, genu, fam, order, phyl, cla
             taxonomy = (
                 session.query(Taxonomy)
                 .filter(Taxonomy.tax_ref == taxref)
-                .filter(Taxonomy.strain == stra) # Strain should be unique no?
                 .first()
             )
             print(f"After query, {taxonomy=}")
@@ -577,7 +575,6 @@ def taxonomy_addition (session, taxref, taxdb, spec, genu, fam, order, phyl, cla
                 print(f"This taxonomy {taxref} already exists")
                 
             print(f"Taxonomy row returned: {taxonomy}")
-            print(f"{taxref=}, {taxdb=}, {spec=}, {genu=}, {fam=}, {order=}, {phyl=}, {classt=}, {stra=}")
             
             ## (5)
             
@@ -591,7 +588,6 @@ def taxonomy_addition (session, taxref, taxdb, spec, genu, fam, order, phyl, cla
                 proteintaxonomy.taxonomy = taxonomy
                 print(f"{proteintaxonomy=}")
                 print(f"{taxonomy.proteins=}")
-                #taxonomy.proteins.append(proteintaxonomy)
                 protein.taxonomies.append(proteintaxonomy)
                 print(f"{taxonomy.proteins=}")
                 print(f"Linked Taxonomy {taxonomy.tax_id} to Protein {protein.prot_id}")
@@ -635,9 +631,9 @@ if __name__ == "__main__":
 
     # Open the csv file
     # Define path for data file directory
-    raw_dir = Path(__file__).resolve().parent.parent / "data" / "raw" / "prot_info"
+    raw_dir = Path(__file__).resolve().parent.parent / "data" / "raw" / "prot_info" / "incorrect_name"
     # Define path to the data file
-    prot_data_file = raw_dir / "prot_data_minimal_correct.csv"
+    prot_data_file = raw_dir / "prot_data_2_genename.csv"
 
     ## (1) LP: this bit could be refactored into a function
     mydata = []
