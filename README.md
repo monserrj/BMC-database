@@ -2,6 +2,12 @@
 
 Space designed to create the Bacterial microcompartment database. This database is being designed with the objective of facilitating access to BMC protein information for research purposes. Proteins include both structural proteins (e.g.: hexamers) and proteins with other functions that are part of the bacterial microcompartment, such as a chaperone or signature enzyme
 
+## ER Diagram
+
+There is an ER diagram of the current design at the link below:
+
+- [https://dbdiagram.io/d/BMC_db-6679263e9939893dae12efc0](https://dbdiagram.io/d/BMC_db-6679263e9939893dae12efc0)
+
 ## TABLE OF CONTENT
 
 - .github : useful github instructions
