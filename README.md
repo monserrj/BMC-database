@@ -11,11 +11,8 @@ There is an ER diagram of the current design at the link below:
 ## TABLE OF CONTENT
 
 - .github : useful github instructions
-- assets : miscellaneous documents for different purposes not directly related to database development
-- data : Data generated (raw or cleaned) or downloaded for database development
-- docs : Important documents such as methods or training material
-- notebooks : Not used yet
-- results : ouputs obtained from database development
+- data : Data generated (raw) or downloaded for database development
+- docs : Important documents such as training material
 - scripts : code in development to create database
 - .gitignore
 - _config.yml
