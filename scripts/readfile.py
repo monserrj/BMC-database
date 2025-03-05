@@ -51,11 +51,8 @@ def read_csvfile (file_path):
         return None
 
 # Provisional: Check the file selection and reading process
-def main ():
-    read_csvfile()
-    
-file_path = select_csvfile()
-if file_path:
-    data = read_csvfile(file_path)
-    # Show first row for verification
-    print("File successfully read. Data preview:", data[:1])
+# file_path = select_csvfile()
+# if file_path:
+#     data = read_csvfile(file_path)
+#     # Show first row for verification
+#     print("File successfully read. Data preview:", data[:1])
