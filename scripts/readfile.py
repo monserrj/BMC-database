@@ -24,7 +24,7 @@ from pathlib import Path
         ),
     ) # To define path/file as an argument and make Click treat any input as a path object.
 # Define the click function
-def cli_open_csvfile (filepath):
+def cli_open_csvfile(filepath):
     """ Prompt to enter the path and filename of csv file and then read
     the data"""
     mydata = []
@@ -32,7 +32,7 @@ def cli_open_csvfile (filepath):
         with open(filepath, newline="", encoding="utf-8") as csvfile:
             reader = csv.reader(csvfile)
             next(reader)  # Skip header row
-            
+
             for row in reader:
                 # Convert empty strings to Null
                 row = [None if val == "" else val for val in row]
@@ -46,9 +46,9 @@ def cli_open_csvfile (filepath):
     except Exception as e:
         click.echo(f"Error reading file: {e}")
         raise click.Abort  # Aborts with error
-    
+
     # Show first row for verification:
-    click.echo(mydata[1])
+    click.echo(mydata[0])
     click.echo() # Add an extra line to the end of the output
 
 # Provisional: Check the file selection and reading process
