@@ -23,8 +23,11 @@ from pathlib import Path
         path_type=Path, # Return the input into a path object
         ),
     ) # To define path/file as an argument and make Click treat any input as a path object.
+@click.option("--verbose", "-v",
+              is_flag=True,
+              help="Provide more informative output.")
 # Define the click function
-def cli_open_csvfile(filepath):
+def cli_open_csvfile(filepath, verbose):
     """ Prompt to enter the path and filename of csv file and then read
     the data"""
     mydata = []
@@ -42,15 +45,15 @@ def cli_open_csvfile(filepath):
                     mydata.append(tuple(row))
                 else:
                     click.echo("No sequence data, discarding")
-        click.echo("Data read correctly")
+        if verbose:
+            click.echo("Data read correctly")
     except Exception as e:
         click.echo(f"Error reading file: {e}")
         raise click.Abort  # Aborts with error
 
     # Show first row for verification:
-    click.echo(mydata[0])
-    click.echo() # Add an extra line to the end of the output
-
+    if verbose:
+        click.echo(str(mydata[0]) + "\n")
 # Provisional: Check the file selection and reading process
 
 
