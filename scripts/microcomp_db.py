@@ -24,7 +24,7 @@ from db import create_db
 from readfile import select_csvfile, read_csvfile
 
 
-def main ():
+def main():
     create_db()
     select_csvfile()
     read_csvfile()
@@ -40,7 +40,6 @@ def main ():
 # This is a common Python idiom
 if __name__ == "__main__":
     main()
-
 
     # Add the data to the database
     for idx, (
@@ -67,7 +66,6 @@ if __name__ == "__main__":
         pathid,
         KOid,
     ) in enumerate(mydata):
-        
         # Check what data is available:
         # print(f"This is before adding session.query {protseq=}, {NCBIid=},{uniprot=}, {struct=}")
         print(f"\nStarting next loop ({idx=}) with {uniprot=}, {KOid=}")
@@ -83,18 +81,15 @@ if __name__ == "__main__":
                 dnaseq=dnaseq,
             )
             print(f"\nProtein record returned: {protein}")
-        
+
             # Add name data
             name = name_addition(
-                session,
-                genename=genename,
-                namerank=namerank,
-                protein = protein
+                session, genename=genename, namerank=namerank, protein=protein
             )
-        
+
             print(f"\nProtein record returned: {protein}")
             print(f"Name record returned: {name}")
-        
+
             # Add taxonomy data
             # We expect a single tax_id per protein, so if the protein
             # already is linked to a taxonomy, we skip adding the taxonomy
@@ -102,15 +97,15 @@ if __name__ == "__main__":
                 taxonomy = taxonomy_addition(
                     session,
                     taxref=taxref,
-                    taxdb = taxdb,
-                    spec = spec,
-                    genu = genu,
-                    fam = fam,
-                    order = order,
-                    phyl = phyl,
-                    classt = classt,
-                    stra = stra,
-                    protein = protein
+                    taxdb=taxdb,
+                    spec=spec,
+                    genu=genu,
+                    fam=fam,
+                    order=order,
+                    phyl=phyl,
+                    classt=classt,
+                    stra=stra,
+                    protein=protein,
                 )
                 print(f"\nProtein record returned: {protein}")
                 print(f"Name record returned: {name}")
