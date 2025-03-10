@@ -10,22 +10,20 @@ import click
 # Import path to be able to open .csv files in different folders
 from pathlib import Path
 
-# Script below here:
 
 # Create a click function
-@click.command() # Declare function as a click command
-# @click.version_option("0.1.0", prog_name="select_csvfile") # Defines the name and version of the click function
-@click.argument("filepath",
-    type=click.Path( # Define type of arg",
-        exists=True, # makes sure the file exists
-        file_okay=True, # makes sure the input path points to a file
-        readable=True, # Make sure the content is readable
-        path_type=Path, # Return the input into a path object
-        ),
-    ) # To define path/file as an argument and make Click treat any input as a path object.
-@click.option("--verbose", "-v",
-              is_flag=True,
-              help="Provide more informative output.")
+@click.command()  # Declare function as a click command
+# @click.version_option("0.1.0", prog_name="select_csvfile")  # Defines the name and version of the click function
+@click.argument(
+    "filepath",
+    type=click.Path(  # Define type of arg",
+        exists=True,  # makes sure the file exists
+        file_okay=True,  # makes sure the input path points to a file
+        readable=True,  # Make sure the content is readable
+        path_type=Path,  # Return the input into a path object
+    ),
+)  # To define path/file as an argument and make Click treat any input as a path object.
+@click.option("--verbose", "-v", is_flag=True, help="Provide more informative output.")
 # Define the click function
 def cli_open_csvfile(filepath, verbose):
     """ Prompt to enter the path and filename of csv file and then read
