@@ -9,8 +9,6 @@ import csv
 import click
 # Import path to be able to open .csv files in different folders
 from pathlib import Path
-# For exiting system for trouble shooting import sys
-import sys
 
 # Script below here:
 
