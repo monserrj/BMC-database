@@ -23,8 +23,6 @@ from pathlib import Path
         path_type=Path, # Return the input into a path object
         ),
     ) # To define path/file as an argument and make Click treat any input as a path object.
-
-
 # Define the click function
 def cli_open_csvfile (filepath):
     """ Prompt to enter the path and filename of csv file and then read
@@ -44,11 +42,10 @@ def cli_open_csvfile (filepath):
                     mydata.append(tuple(row))
                 else:
                     click.echo("No sequence data, discarding")
-        # filepath = click.prompt("Enter the filepath to add data to your database:", type=click.File)
-        # I do not need this as I want a more direct approach readfile.py --infile path/to/my_file.csv
         click.echo("Data read correctly")
     except Exception as e:
         click.echo(f"Error reading file: {e}")
+        raise click.Abort  # Aborts with error
     
     # Show first row for verification:
     click.echo(mydata[1])
