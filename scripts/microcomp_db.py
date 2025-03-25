@@ -7,7 +7,7 @@
 # and populate database
 from db import create_db
 from readfile import cli_open_csvfile
-from data_and_csv import link_db_csv
+from file_and_data import link_db_csv
 from data_addition import add_data
 # Temporary code to delete local database while we debug
 from pathlib import Path
