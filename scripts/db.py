@@ -22,7 +22,7 @@ from sqlalchemy import create_engine
 # from sqlalchemy.exc import IntegrityError, PendingRollbackError
 # For exiting system for trouble shooting import sys
 import sys
-
+from typing import Optional
 # Database set up:
 
 # Create a base class to inherit from.
@@ -159,14 +159,9 @@ class Protein(Base):
     locus_NCBI_id = Column(String, unique=True, nullable=True)
     uniprot_id = Column(String, unique=True, nullable=True)
     struct_prot_type = Column(Integer, nullable=True)
-<<<<<<< HEAD
-    dna_seq = Column(String, nullable=False, unique=True) # New addition for testing Name instead of gen table
-    
-=======
     dna_seq = Column(
         String, nullable=False, unique=True
     )  # New addition for testing Name instead of gen table
-
     # Introduce back_populates so when a relationship between different tables is
     # introduced, they information will be back-populated to be consistent across
     # all tables. Relationships must be introduced in both related tables (e.g.:
@@ -177,7 +172,6 @@ class Protein(Base):
     # interacts = relationship(
     #     "Protprotinteract",  secondary=proteincomplex, back_populates="proteins", lazy="dynamic"
     #     )
->>>>>>> 0f16c2b0710c3db45c944f19ca5c3262400ac300
     # Define type of output for protein
     def __str__(self):
         outstr = [
@@ -355,3 +349,6 @@ def create_db():
     """Function to create all the tables from the database"""
     Base.metadata.create_all(bind=engine)
     print("Database and tables created successfully")
+
+if __name__ =="__main__":
+    create_db()
