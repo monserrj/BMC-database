@@ -33,7 +33,7 @@ def cli_open_csvfile(filepath, verbose):
         with open(filepath, newline="", encoding="utf-8") as csvfile:
             reader = csv.reader(csvfile)
             next(reader)  # Skip header row
-
+            
             for row in reader:
                 # Convert empty strings to Null
                 row = [None if val == "" else val for val in row]
@@ -45,10 +45,12 @@ def cli_open_csvfile(filepath, verbose):
                     click.echo("No sequence data, discarding")
         if verbose:
             click.echo("Data read correctly")
+        return mydata
     except Exception as e:
         click.echo(f"Error reading file: {e}")
         raise click.Abort  # Aborts with error
-
+    
+    
     # Show first row for verification:
     if verbose:
         click.echo(str(mydata[0]) + "\n")

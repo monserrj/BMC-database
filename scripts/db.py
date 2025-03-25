@@ -18,11 +18,8 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 # Create_engine function to create an engine object
 from sqlalchemy import create_engine
 
-# To be able to make exceptions in code (try/except):
-# from sqlalchemy.exc import IntegrityError, PendingRollbackError
-# For exiting system for trouble shooting import sys
-import sys
 from typing import Optional
+
 # Database set up:
 
 # Create a base class to inherit from.
@@ -30,15 +27,15 @@ Base = declarative_base()
 
 # Create a database engine to connect to the database.
 # This creates a new empty database file called bmc.db in the current directory.
-engine = create_engine("sqlite:///bmc.db")
+db_URL = "sqlite:///bmc.db"
+engine = create_engine(db_URL)
 
-# Session set up:
-Session = sessionmaker()  # we also need a session object
-Session.configure(bind=engine)
-session = Session()
+# # Session set up:
+# Session = sessionmaker()  # we also need a session object
+# Session.configure(bind=engine)
+# session = Session()
 
 # Database creation:
-
 
 # Create the tables in the database.
 # Tables with one-to-many and many-to-many relationships must be created
