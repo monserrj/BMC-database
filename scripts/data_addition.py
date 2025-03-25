@@ -53,32 +53,35 @@ Base = declarative_base()
 
 # Making a function for the addition of data to the different tables created with db.py:
 
+
 # Function for protein data addition
-def protein_addition(session, protseq, NCBIid, uniprot, struct, dnaseq): 
+def protein_addition(session, protseq, NCBIid, uniprot, struct, dnaseq):
     # Args:
     # protseq (str): Protein sequence.
     # NCBIid (str): NCBI locus ID.
     # uniprot (str): UniProt ID.
     # struct (str): Protein structure type.
     # dnaseq (str): Gene DNA sequence.
-    
+
     # Explanation on how the code works:
     # 1. If the protein already exists, store it in the `protein` variable
     # 2. If the protein does not exist, create a new protein object and add it to
     #    the session
     # 3. Commit the session to the database
-    
+
     ## NOTE: SQLAlchemy will autoflush the session when we query the database, so we
     ##       do not need to manually flush the session before committing
     ##       (https://docs.sqlalchemy.org/en/20/orm/session_basics.html#session-flushing)
     ##       This will also automatically commit the session if no exceptions are
     ##       raised but, if errors are raised, we will need to rollback the session
     ##       and continue to the next entry.
-    
+
     print(f"\nNow in {protein_addition.__name__}")
-    
-    print(f"Before query, {protseq[:10]=}..., {NCBIid=}, {uniprot=}, {struct=}, {dnaseq[:10]=}")
-        
+
+    print(
+        f"Before query, {protseq[:10]=}..., {NCBIid=}, {uniprot=}, {struct=}, {dnaseq[:10]=}"
+    )
+
     # Create a new protein object
     protein = (
         session.query(Protein)
@@ -90,7 +93,7 @@ def protein_addition(session, protseq, NCBIid, uniprot, struct, dnaseq):
         .first()
     )
     print(f"After query, {protein=}")
-        
+
     # Add protein if it is not already present
     if not protein:
         protein = Protein(
@@ -101,34 +104,35 @@ def protein_addition(session, protseq, NCBIid, uniprot, struct, dnaseq):
             dna_seq=dnaseq,
         )
         session.add(protein)
-        session.flush () # This sends the changes to the database, so prot_id is assigned
+        session.flush()  # This sends the changes to the database, so prot_id is assigned
     else:
         print(f"Protein with prot id XXXX and NCBI_id {NCBIid} already exists")
-            
+
     print(f"Protein row returned: {protein}")
-        
+
     # Try to commit our changes
     print("Committing changes")
     session.commit()
-        
+
     # except Exception as exc:
     #     print(f"Error committing protein/gene combination: {exc}")
     #     print("Rolling back changes and skipping to next entry\n")
     #     session.rollback()
-        # Rollback makes it that when there is a "fail", 
-        # like not unique uniprot reference, its "forgets" the error and keeps going.
-    
+    # Rollback makes it that when there is a "fail",
+    # like not unique uniprot reference, its "forgets" the error and keeps going.
+
     return (
         protein  # Return the protein row we just added to the db/otherwise dealt with
     )
 
+
 # Function for name data addition
-def name_addition(session, genename, namerank, protein): 
+def name_addition(session, genename, namerank, protein):
     # Args:
     # name (str): Gene name.
     # namerank (int): Rank of the gene name associated with the protein.
     # protein: Protein information added with protein_addition function
-    
+
     # Explanation on how the code works:
     # 1. Check if the name already exists,  store it in the `name` variable
     # 2. If the name does not exist, create a new name object and add it to the
@@ -136,13 +140,13 @@ def name_addition(session, genename, namerank, protein):
     # 3. Check if the name is already associated with the protein, and if not
     #    create a new `proteinname` object and add it to the session
     # 4. Commit the session to the database
-    
+
     print(f"\nNow in {name_addition.__name__}")
-    
+
     with session.no_autoflush:
-        #try:
+        # try:
         print(f"Before query, {genename=}")
-        
+
         # Create a new name object
         name = (
             session.query(Name)
@@ -151,25 +155,23 @@ def name_addition(session, genename, namerank, protein):
             .first()
         )
         print(f"After query, {name=}")
-            
+
         # Add name if it is not already present
         if not name:
             name = Name(gene_name=genename)
             session.add(name)
-            session.flush ()
+            session.flush()
             print(f"Name {genename=} added")
         else:
-            print(
-                    f"This gene name {genename} has already being added"
-                )
+            print(f"This gene name {genename} has already being added")
         print(f"Name row returned: {name}")
-            
+
         # Associate the gene name and protein information in the protein_gene table
         # Leighton suggested to make a specific function only for merged tables,
         # I think I want them linked because if I add a gene I want the information
         # instantly available for my protein and linked. need to double check with LP
         print(f"{name.proteins=}, {type(name.proteins)}")
-            
+
         if name not in name.proteins:
             print(f"{protein.prot_id=}, {name.name_id=}, {namerank=}")
             proteinname = ProteinName(name_rank=int(namerank))
@@ -189,19 +191,20 @@ def name_addition(session, genename, namerank, protein):
             )
         print(f"{name}")
         # print(f"Linked gene from protein: {proteingene.gene}")
-            
+
         # Try to commit our changes
         # print("Committing changes")
         # session.commit()
-            
+
         # except Exception as exc:
         #     print(f"Error committing protein/gene combination: {exc}")
         #     print("Rolling back changes and skipping to next entry")
         #     session.rollback()
-        # Rollback makes it that when there is a "fail", 
+        # Rollback makes it that when there is a "fail",
         # like not unique uniprot reference, its "forgets" the error and keeps going.
-            
+
         return name  # Return the gene row we just added to the db/otherwise dealt with
+
 
 # Function for taxonomy data addition:
 def taxonomy_addition(
@@ -218,7 +221,7 @@ def taxonomy_addition(
     # classt (str): Class (taxonomy classification)
     # stra (str): Strain (taxonomy classification)
     # protein: Protein information added with protein_addition function
-    
+
     # Explanation on how the code works:
     # 1. Check if the taxonomy already exists, and if so store it in the `tax`
     #    variable
@@ -227,9 +230,9 @@ def taxonomy_addition(
     # 3. Then check if the taxonomy is already associated with the protein being added, and if not
     #    create a new `proteintax` object and add it to the session
     # 4. Commit the session to the database
-    
+
     print(f"\nNow in {taxonomy_addition.__name__}")
-    
+
     # LP: Had to turn off autoflushing to suppress an error here
     # See https://github.com/sqlalchemy/sqlalchemy/discussions/12049=
     with session.no_autoflush:
@@ -238,13 +241,9 @@ def taxonomy_addition(
             f"Before query, {taxref=}, {taxdb=}, {spec=}, {genu=}, {fam=}, {order=}, {phyl=}, {classt=}, {stra=}"
         )
         # Create a new taxonomy object
-        taxonomy = (
-            session.query(Taxonomy)
-            .filter(Taxonomy.tax_ref == taxref)
-            .first()
-            )
+        taxonomy = session.query(Taxonomy).filter(Taxonomy.tax_ref == taxref).first()
         print(f"After query, {taxonomy=}")
-            
+
         # Add taxonomy if it is not already present
         if not taxonomy:
             taxonomy = Taxonomy(
@@ -263,14 +262,14 @@ def taxonomy_addition(
             print(f"Taxonomy {taxref=} added")
         else:
             print(f"This taxonomy {taxref} already exists")
-                
+
         print(f"Taxonomy row returned: {taxonomy}")
-            
+
         ## (5)
-            
+
         # Associate the taxonomy with the protein information in the protein_tax table
         print(f"{taxonomy.proteins=}, {type(taxonomy.proteins)}")
-            
+
         if taxonomy not in taxonomy.proteins:
             print(f"{protein.prot_id=}, {taxonomy.tax_id=}")
             proteintaxonomy = ProteinTaxonomy()
@@ -286,19 +285,18 @@ def taxonomy_addition(
         else:
             print(
                 f"Taxonomy {taxonomy.tax_id} is already linked to Protein {protein.prot_id}"
-                )
+            )
         print(f"{taxref}, {spec}, {stra}")
-            
+
         #     # Try to commit our changes;
         #     print("Committing changes")
         #     session.commit()
-            
+
         # except Exception as exc:
         #     print(f"Error committing protein/gene combination: {exc}")
         #     print("Rolling back changes and skipping to next entry")
         #     session.rollback()
-        return taxonomy # Return the taxonomy row we just added to the db/otherwise dealt with
-
+        return taxonomy  # Return the taxonomy row we just added to the db/otherwise dealt with
 
 
 # Script below here
@@ -324,10 +322,10 @@ if __name__ == "__main__":
     # Open the csv file
     # Define path for data file directory
     raw_dir = (
-        Path(__file__).resolve().parent.parent 
-        / "data" 
-        / "raw" 
-        / "prot_info" 
+        Path(__file__).resolve().parent.parent
+        / "data"
+        / "raw"
+        / "prot_info"
         / "incorrect_name"
     )
     # Define path to the data file
@@ -374,7 +372,6 @@ if __name__ == "__main__":
         pathid,
         KOid,
     ) in enumerate(mydata):
-        
         # Check what data is available:
         # print(f"This is before adding session.query {protseq=}, {NCBIid=},{uniprot=}, {struct=}")
         print(f"\nStarting next loop ({idx=}) with {uniprot=}, {KOid=}")
@@ -390,18 +387,15 @@ if __name__ == "__main__":
                 dnaseq=dnaseq,
             )
             print(f"\nProtein record returned: {protein}")
-        
+
             # Add name data
             name = name_addition(
-                session,
-                genename=genename,
-                namerank=namerank,
-                protein = protein
+                session, genename=genename, namerank=namerank, protein=protein
             )
-        
+
             print(f"\nProtein record returned: {protein}")
             print(f"Name record returned: {name}")
-        
+
             # Add taxonomy data
             # We expect a single tax_id per protein, so if the protein
             # already is linked to a taxonomy, we skip adding the taxonomy
@@ -409,15 +403,15 @@ if __name__ == "__main__":
                 taxonomy = taxonomy_addition(
                     session,
                     taxref=taxref,
-                    taxdb = taxdb,
-                    spec = spec,
-                    genu = genu,
-                    fam = fam,
-                    order = order,
-                    phyl = phyl,
-                    classt = classt,
-                    stra = stra,
-                    protein = protein
+                    taxdb=taxdb,
+                    spec=spec,
+                    genu=genu,
+                    fam=fam,
+                    order=order,
+                    phyl=phyl,
+                    classt=classt,
+                    stra=stra,
+                    protein=protein,
                 )
                 print(f"\nProtein record returned: {protein}")
                 print(f"Name record returned: {name}")
