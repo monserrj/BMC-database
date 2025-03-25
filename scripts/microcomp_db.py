@@ -24,6 +24,8 @@ from db import create_db
 from readfile import select_csvfile, read_csvfile
 
 
+# Temporary code to delete local database while we debug
+Path("bmc.db").unlink()
 def main ():
     create_db()
     select_csvfile()
