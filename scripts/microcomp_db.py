@@ -16,10 +16,10 @@ import click
 
 # Import the database file, csv and the data addition file to create
 # and populate database
-from db import create_db
+from db import create_db, get_session
 from readfile import cli_open_csvfile
 from file_and_data import link_db_csv
-# from data_addition import add_data
+from data_addition import add_data
 
 
 @click.command()
@@ -42,9 +42,13 @@ def main(dbpath: Path, force: bool):
         print(f"Not overwriting {dbpath} (exiting)")
         sys.exit(0)
     create_db(dbpath)
-    sys.exit(0)
+    session = get_session(dbpath)
+    print(session)
+    sys.exit()
+
     # Add data from CSV file into bmc.db
     add_data()
+
     # Read CSV file to import data
     cli_open_csvfile()
     # Link the data from the CSV file to the database

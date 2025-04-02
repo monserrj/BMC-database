@@ -2,6 +2,7 @@
 
 # This script is the development of the BMC db. Instructions
 # followed and explanations needed kept to help following through
+from pathlib import Path  # for type hints
 
 # Import  SQLAlchemy classes needed with a declarative approach.
 from sqlalchemy.orm import declarative_base, sessionmaker
@@ -15,6 +16,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 
+# Import a sessionmaker to create a session object
+from sqlalchemy.orm import sessionmaker
+
 # Create_engine function to create an engine object
 from sqlalchemy import create_engine
 
@@ -25,8 +29,8 @@ from typing import Optional
 # Create a base class to inherit from.
 Base = declarative_base()
 
-# # Session set up:
-# Session = sessionmaker()  # we also need a session object
+# Session set up:
+Session = sessionmaker()  # we also need a session object
 # Session.configure(bind=engine)
 # session = Session()
 
@@ -339,7 +343,7 @@ class EnzymePath(Base):
 #     __table_args__ = (UniqueConstraint("prot_id_1", "prot_id_2", "prot_id_3", "prot_id_4", "prot_id_5", "prot_id_6", "prot_id_7"),)
 
 
-def create_db(dbpath):
+def create_db(dbpath: Path):
     """Function to create all the tables from the database"""
     # Create a database engine to connect to the database.
     # This creates a new empty database file called bmc.db in the current directory.
@@ -347,6 +351,14 @@ def create_db(dbpath):
     engine = create_engine(db_URL)
     Base.metadata.create_all(bind=engine)
     print("Database and tables created successfully")
+
+
+def get_session(dbpath: Path):
+    """Returns live session to database."""
+    db_URL = f"sqlite:///{dbpath}"
+    engine = create_engine(db_URL)
+    Session.configure(bind=engine)
+    return Session()
 
 
 if __name__ == "__main__":
