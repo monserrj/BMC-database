@@ -53,9 +53,8 @@ def main(dbpath: Path, csvpath: Path, force: bool, verbose: bool):
     session = get_session(dbpath)
 
     # Read CSV file to import data
-    print(f"{csvpath=}")
+    # print(f"{csvpath=}")
     data = read_file(csvpath, verbose)
-    sys.exit(0)
 
     # Link the data from the CSV file to the database
     link_db_csv()
