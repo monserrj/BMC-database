@@ -25,17 +25,13 @@ from typing import Optional
 # Create a base class to inherit from.
 Base = declarative_base()
 
-# Create a database engine to connect to the database.
-# This creates a new empty database file called bmc.db in the current directory.
-db_URL = "sqlite:///bmc.db"
-engine = create_engine(db_URL)
-
 # # Session set up:
 # Session = sessionmaker()  # we also need a session object
 # Session.configure(bind=engine)
 # session = Session()
 
 # Database creation:
+
 
 # Create the tables in the database.
 # Tables with one-to-many and many-to-many relationships must be created
@@ -159,6 +155,7 @@ class Protein(Base):
     dna_seq = Column(
         String, nullable=False, unique=True
     )  # New addition for testing Name instead of gen table
+
     # Introduce back_populates so when a relationship between different tables is
     # introduced, they information will be back-populated to be consistent across
     # all tables. Relationships must be introduced in both related tables (e.g.:
@@ -342,10 +339,15 @@ class EnzymePath(Base):
 #     __table_args__ = (UniqueConstraint("prot_id_1", "prot_id_2", "prot_id_3", "prot_id_4", "prot_id_5", "prot_id_6", "prot_id_7"),)
 
 
-def create_db():
+def create_db(dbpath):
     """Function to create all the tables from the database"""
+    # Create a database engine to connect to the database.
+    # This creates a new empty database file called bmc.db in the current directory.
+    db_URL = f"sqlite:///{dbpath}"
+    engine = create_engine(db_URL)
     Base.metadata.create_all(bind=engine)
     print("Database and tables created successfully")
 
-if __name__ =="__main__":
+
+if __name__ == "__main__":
     create_db()
