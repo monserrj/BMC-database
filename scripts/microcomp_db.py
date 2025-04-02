@@ -17,9 +17,8 @@ import click
 # Import the database file, csv and the data addition file to create
 # and populate database
 from db import create_db, get_session
-from readfile import cli_open_csvfile
+from readfile import read_file
 from file_and_data import link_db_csv
-from data_addition import add_data
 
 
 @click.command()
@@ -29,10 +28,19 @@ from data_addition import add_data
     type=click.Path(exists=False, path_type=Path),
 )
 @click.option(
+    "--csvpath",
+    default=Path("../data/raw/prot_info/prot_data_minimal_correct.csv"),
+    type=click.Path(exists=False, path_type=Path),
+)
+@click.option(
     "--force/--no-force",
     default=False,
 )
-def main(dbpath: Path, force: bool):
+@click.option(
+    "--verbose/--no-verbose",
+    default=False,
+)
+def main(dbpath: Path, csvpath: Path, force: bool, verbose: bool):
     print(dbpath)
     """Main function to run the script."""
     # Create the database if it doesn't exist, or we're forcing overwrite
@@ -43,14 +51,12 @@ def main(dbpath: Path, force: bool):
         sys.exit(0)
     create_db(dbpath)
     session = get_session(dbpath)
-    print(session)
-    sys.exit()
-
-    # Add data from CSV file into bmc.db
-    add_data()
 
     # Read CSV file to import data
-    cli_open_csvfile()
+    print(f"{csvpath=}")
+    data = read_file(csvpath, verbose)
+    sys.exit(0)
+
     # Link the data from the CSV file to the database
     link_db_csv()
 
