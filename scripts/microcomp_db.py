@@ -57,7 +57,7 @@ def main(dbpath: Path, csvpath: Path, force: bool, verbose: bool):
     data = read_file(csvpath, verbose)
 
     # Link the data from the CSV file to the database
-    link_db_csv()
+    link_db_csv(data, session)
 
 
 # The syntax here is "special"

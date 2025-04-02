@@ -7,10 +7,11 @@
 # To be able to make exceptions in code (try/except):
 # from sqlalchemy.exc import IntegrityError, PendingRollbackError
 # For exiting system for trouble shooting import sys
-import sys
+from db import protein_addition, taxonomy_addition, name_addition
+
 
 # Making a function for the addition of data to the different tables created with db.py following data_instructions:
-def link_db_csv():
+def link_db_csv(mydata, session):
     # Function for each data type addition created
     # Add the data to the database in a loop, but we'll have to
     # check if the data entered already exist
@@ -149,4 +150,3 @@ def link_db_csv():
     # #     print("GENES:")
     # #     for gene in protein.gene:
     # #         print(f"\t{gene.gen_seq}, {gene.gen_id}, {gene.gen_name}")
-
