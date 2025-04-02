@@ -2,6 +2,7 @@
 
 # This script allows for the creation of the database with data using db.py an data_addition.py. Instructions
 # followed and explanations kept to help following through
+from pathlib import Path
 
 # Import the database file, csv and the data addition file to create
 # and populate database
@@ -9,8 +10,8 @@ from db import create_db
 from readfile import cli_open_csvfile
 from file_and_data import link_db_csv
 from data_addition import add_data
+
 # Temporary code to delete local database while we debug
-from pathlib import Path
 Path("bmc.db").unlink()
 
 # The syntax here is "special"
