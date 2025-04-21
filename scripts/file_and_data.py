@@ -7,7 +7,7 @@
 # To be able to make exceptions in code (try/except):
 # from sqlalchemy.exc import IntegrityError, PendingRollbackError
 # For exiting system for trouble shooting import sys
-from db import protein_addition, taxonomy_addition, name_addition
+from db import protein_addition, taxonomy_addition, name_addition, gene_addition
 
 
 # Making a function for the addition of data to the different tables created with db.py following data_instructions:
@@ -51,12 +51,19 @@ def link_db_csv(mydata, session):
             protein = protein_addition(
                 session,
                 protseq=protseq,
-                NCBIid=NCBIid,
                 uniprot=uniprot,
                 struct=struct,
-                dnaseq=dnaseq,
             )
             print(f"\nProtein record returned: {protein}")
+            
+            gene = gene_addition(
+                session,
+                NCBIid=NCBIid,
+                dnaseq=dnaseq,
+                protein=protein,
+            )
+            print(f"\nProtein record returned: {protein}")
+            print(f"\nGene record returned: {gene}")
 
             # Add name data
             name = name_addition(
@@ -84,6 +91,7 @@ def link_db_csv(mydata, session):
                     protein=protein,
                 )
                 print(f"\nProtein record returned: {protein}")
+                print(f"Gene record returned: {gene}")
                 print(f"Name record returned: {name}")
                 print(f"Taxonomy record returned: {taxonomy}")
             session.commit()

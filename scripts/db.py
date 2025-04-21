@@ -53,7 +53,15 @@ class ProteinName(Base):
     protein: Mapped["Protein"] = relationship(back_populates="names")
     # UniqueConstraint("prot_id", "name_id", "name_rank")
 
-
+class ProteinGene(Base):
+    __tablename__ = "protein_gene"
+    prot_id: Mapped[int] = mapped_column(
+        ForeignKey("protein.prot_id"), primary_key=True
+    )
+    gene_id: Mapped[int] = mapped_column(ForeignKey("gene.gene_id"), primary_key=True)
+    gene: Mapped["Gene"] = relationship(back_populates="proteins")
+    protein: Mapped["Protein"] = relationship(back_populates="genes")
+    
 class ProteinTaxonomy(Base):
     __tablename__ = "protein_taxonomy"
     prot_id: Mapped[int] = mapped_column(
@@ -143,6 +151,7 @@ class Protein(Base):
     __tablename__ = "protein"  # this is the name that will be used in SQLite
     # Introduce all relationship between tables:
     names: Mapped[list["ProteinName"]] = relationship()
+    genes: Mapped[list["ProteinGene"]] = relationship()
     taxonomies: Mapped[list["ProteinTaxonomy"]] = relationship()
     pdbs: Mapped[list["ProteinPdb"]] = relationship()
     domains: Mapped[list["ProteinDomain"]] = relationship()
@@ -150,15 +159,12 @@ class Protein(Base):
     # canonicals: Mapped[list["Isoforms"]] = relationship() # I am sure this is wrong, fix when TS
     functions: Mapped[list["ProteinFunction"]] = relationship()
     paths: Mapped[list["ProteinPath"]] = relationship()
+    
     # Define table content:
     prot_id = Column(Integer, primary_key=True, autoincrement=True)
     prot_seq = Column(String, nullable=False, unique=True)
-    locus_NCBI_id = Column(String, unique=True, nullable=True)
     uniprot_id = Column(String, unique=True, nullable=True)
     struct_prot_type = Column(Integer, nullable=True)
-    dna_seq = Column(
-        String, nullable=False, unique=True
-    )  # New addition for testing Name instead of gen table
 
     # Introduce back_populates so when a relationship between different tables is
     # introduced, they information will be back-populated to be consistent across
@@ -175,13 +181,23 @@ class Protein(Base):
         outstr = [
             f"Protein ID: {self.prot_id}",
             f"Protein sequence: {self.prot_seq}",
-            f"NCBI ID: {self.locus_NCBI_id}",
             f"Uniprot ID: {self.uniprot_id}",
             f"Protein structure type: {self.struct_prot_type}",
-            f"DNA sequence: {self.dna_seq}",
         ]
         return "\n".join(outstr)
 
+class Gene(Base): # New addition for testing gen table
+    """Table representing the gene details linked to a protein
+    This table will store the gene ID, DNA sequence, and NCBI locus
+    """
+
+    __tablename__ = "gene"
+    # Introduce all relationship between tables:
+    proteins: Mapped[list["ProteinGene"]] = relationship()
+    # Define table content:
+    gene_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
+    locus_NCBI_id = Column(String, unique=True, nullable=True)
+    dna_seq = Column(String, nullable=False, unique=True)  
 
 class Name(Base):
     """Table representing a gene name
@@ -343,14 +359,14 @@ class EnzymePath(Base):
 #     __table_args__ = (UniqueConstraint("prot_id_1", "prot_id_2", "prot_id_3", "prot_id_4", "prot_id_5", "prot_id_6", "prot_id_7"),)
 
 
+
+
 # Function for protein data addition
-def protein_addition(session, protseq, NCBIid, uniprot, struct, dnaseq):
+def protein_addition(session, protseq, uniprot, struct):
     # Args:
     # protseq (str): Protein sequence.
-    # NCBIid (str): NCBI locus ID.
     # uniprot (str): UniProt ID.
     # struct (str): Protein structure type.
-    # dnaseq (str): Gene DNA sequence.
 
     # Explanation on how the code works:
     # 1. If the protein already exists, store it in the `protein` variable
@@ -368,14 +384,13 @@ def protein_addition(session, protseq, NCBIid, uniprot, struct, dnaseq):
     print(f"\nNow in {protein_addition.__name__}")
 
     print(
-        f"Before query, {protseq[:10]=}..., {NCBIid=}, {uniprot=}, {struct=}, {dnaseq[:10]=}"
+        f"Before query, {protseq[:10]=}..., {uniprot=}, {struct=}"
     )
     # Create a new protein object
     protein = (
         session.query(Protein)
         # Prot_id added automatically
         .filter(Protein.prot_seq == protseq)
-        .filter(Protein.locus_NCBI_id == NCBIid)
         .filter(Protein.uniprot_id == uniprot)
         # Protein struct is just the type (e.g.: hexamer), will be repeated
         .first()
@@ -386,15 +401,13 @@ def protein_addition(session, protseq, NCBIid, uniprot, struct, dnaseq):
     if not protein:
         protein = Protein(
             prot_seq=protseq,
-            locus_NCBI_id=NCBIid,
             uniprot_id=uniprot,
             struct_prot_type=struct,
-            dna_seq=dnaseq,
         )
         session.add(protein)
         session.flush()  # This sends the changes to the database, so prot_id is assigned
     else:
-        print(f"Protein with prot id XXXX and NCBI_id {NCBIid} already exists")
+        print(f"Protein with prot uniprot ID {uniprot} already exists")
 
     print(f"Protein row returned: {protein}")
 
@@ -411,6 +424,68 @@ def protein_addition(session, protseq, NCBIid, uniprot, struct, dnaseq):
     return (
         protein  # Return the protein row we just added to the db/otherwise dealt with
     )
+
+def gene_addition(session, NCBIid, dnaseq, protein):
+    # Args:
+    # NCBIid (str): NCBI locus ID.
+    # dnaseq (str): Gene DNA sequence.
+    # protein: Protein information added with protein_addition function
+
+    # Explanation on how the code works:
+    # 1. Check if the gene already exists,  store it in the `gene` variable
+    # 2. If the gene does not exist, create a new gene object and add it to the
+    #    session
+    # 3. Check if the gene is already associated with the protein, and if not
+    #    create a new `proteingene` object and add it to the session
+    # 4. Commit the session to the database
+
+    print(f"\nNow in {gene_addition.__name__}")
+
+    with session.no_autoflush:
+        # try:
+        print(f"Before query, {NCBIid=}, {dnaseq[:10]=}...")
+
+        # Create a new gene object
+        gene = (
+            session.query(Gene)
+            # gene_id automatically assigned
+            # DNA seq may not be unique as other llocus/species may have it
+            .filter(Gene.locus_NCBI_id == NCBIid)
+            .first()
+        )
+        print(f"After query, {gene=}")
+
+        # Add gene if it is not already present
+        if not gene:
+            gene = Gene(locus_NCBI_id=NCBIid, dna_seq=dnaseq)
+            session.add(gene)
+            session.flush()
+            print(f"Gene {NCBIid=} added")
+        else:
+            print(f"This gene name {NCBIid} has already being added")
+        print(f"Name row returned: {gene}")
+
+        # Associate the gene and protein information in the protein_gene
+        print(f"{gene.proteins=}, {type(gene.proteins)}")
+
+        if gene not in gene.proteins:
+            print(f"{protein.prot_id=}, {gene.gene_id=}")
+            proteingene = ProteinGene()
+            print(f"{gene.proteins=}")
+            proteingene.gene = gene
+            print(f"{proteingene=}")
+            print(f"{gene.proteins=}")
+            protein.genes.append(proteingene)
+            print(f"{gene.proteins=}")
+            print(f"\nLinked Gene {gene.gene_id} to Protein {protein.prot_id}")
+            print(f"{proteingene=}")
+        else:
+            print(
+                f"Gene name {gene.gene_id} is already linked to Protein {protein.prot_id}"
+            )
+        print(f"{gene}")
+        
+        return gene  # Return the gene row we just added to the db/otherwise dealt with
 
 
 # Function for name data addition
