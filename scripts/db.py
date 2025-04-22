@@ -13,6 +13,7 @@ from sqlalchemy import (
     ForeignKey,
     UniqueConstraint,
     String,
+    or_,
 )
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 
@@ -453,6 +454,20 @@ def gene_addition(session, NCBIid, dnaseq, protein):
             .filter(Gene.locus_NCBI_id == NCBIid)
             .first()
         )
+        # results = session.query(Gene.locus_NCBI_id).all()
+        # print(set([r[0] for r in results]))
+        # gene = (
+        #     session.query(Gene)
+        #     # gene_id automatically assigned
+        #     # DNA seq may not be unique as other llocus/species may have it
+        #     .filter(
+        #         or_(
+        #             Gene.locus_NCBI_id == NCBIid,  # When NCBIid is provided, filter by that
+        #             Gene.locus_NCBI_id.is_(None)   # If NCBIid is None, filter by NULL
+        #         )
+        #     )
+        #     .all()
+        # )
         print(f"After query, {gene=}")
 
         # Add gene if it is not already present
@@ -462,7 +477,7 @@ def gene_addition(session, NCBIid, dnaseq, protein):
             session.flush()
             print(f"Gene {NCBIid=} added")
         else:
-            print(f"This gene name {NCBIid} has already being added")
+            print(f"This gene {NCBIid} has already being added")
         print(f"Name row returned: {gene}")
 
         # Associate the gene and protein information in the protein_gene
