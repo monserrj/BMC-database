@@ -7,7 +7,7 @@
 # To be able to make exceptions in code (try/except):
 # from sqlalchemy.exc import IntegrityError, PendingRollbackError
 # For exiting system for trouble shooting import sys
-from db import protein_addition, taxonomy_addition, name_addition, gene_addition, function_addition
+from db import protein_addition, taxonomy_addition, name_addition, gene_addition, function_addition, pdb_addition
 
 
 # Making a function for the addition of data to the different tables created with db.py following data_instructions:
@@ -106,65 +106,13 @@ def link_db_csv(mydata, session):
             print(f"\nProtein record returned: {protein}")
             print(f"Function record returned: {function}")
 
+            # Add pdb data
+            pdb = pdb_addition(
+                session, pdb_1=pdb_1, pdb_2=pdb_2, pdb_3=pdb_3, protein=protein
+            )
+            print(f"\nProtein record returned: {protein}")
+            print(f"Function record returned: {pdb}")
         except Exception as exc:
             print(f"Error adding data: {exc}")
             print("Rolling back changes and skipping to next entry")
             session.rollback()
-
-    # # Create new pdb
-    # existing_pdb = (
-    #     session.query(Pdb)
-    #     # .filter(Pdb.pdb_id == pdbid) Added automatically
-    #     .filter(Pdb.pdb_acc_1 == pdb_1)
-    #     .filter(Pdb.pdb_acc_2 == pdb_2)
-    #     .filter(Pdb.pdb_acc_3 == pdb_3)
-    #     .first
-    # )
-    # if not existing_pdb:
-    #     new_pdb = Pdb(pdb_acc_1=pdb_1, pdb_acc_2=pdb_2, pdb_acc_3=pdb_3)
-    #     session.add(new_pdb)
-    #     session.commit()
-    #     if new_pdb not in prot.pdb:
-    #         prot.pdb.append(new_pdb)
-    #         session.commit()
-    #         print(f"Added Pdb structure {pdbid} to Protein {protid}")
-    #     else:
-    #         print(f"Pdb structure {pdbid} already associated with Protein {protid}")
-
-    # else:
-    #     print(f" This pdb entry already exist {pdbid}")
-
-    # print(pdbid, pdb_1, pdb_2, pdb_3)
-
-    # # Create new enzyme path
-    # existing_path = (
-    #     session.query(Enzymepath)
-    #     # .filter(Enzymepath.path_id == pathid) Added automatically
-    #     .filter(Enzymepath.KO_ref == KOid)
-    #     .first
-    # )
-    # if not existing_path:
-    #     new_path = Enzymepath(KO_ref=KOid)
-    #     session.add(new_path)
-    #     session.commit()
-    #     if new_path not in prot.path:
-    #         prot.path.append(new_path)
-    #         session.commit()
-    #         print(f"Added EnzymePath {pathid} to Protein {protid}")
-    #     else:
-    #         print(f"EnzymePath {pathid} already associated with Protein {protid}")
-    # else:
-    #     print(f"Existing gene ontology reference {KOid}")
-
-    # print(pathid, KOid)
-
-    # # # Now we can query the database to see if the data has been added correctly
-    # # # Unsure whether I understand this correctly
-    # # for protein in session.query(Protein):
-    # #     print(f"\nPROTEIN: {protein.prot_id}")
-    # #     print("PROTEIN AND GENES:")
-    # #     for gen in protein.protein_gene:
-    # #         print(f"\t{gen.gen_id}, {gen.prot_id}")
-    # #     print("GENES:")
-    # #     for gene in protein.gene:
-    # #         print(f"\t{gene.gen_seq}, {gene.gen_id}, {gene.gen_name}")

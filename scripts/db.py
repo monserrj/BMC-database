@@ -728,6 +728,83 @@ def function_addition(session, goref, gotype, godescription, protein):
         
         return function
 
+# Create new pdb
+def pdb_addition(session, pdb_acc_1, pdb_acc_2, pdb_acc_3, protein):
+    # Args:
+    # pdb_acc_1 (str): Accesion number 1 for pdb reference
+    # pdb_acc_2 (str): Accesion number 2 for pdb reference
+    # pdb_acc_3 (str): Accesion number 3 for pdb reference
+    # protein: Protein information added with protein_addition function
+
+    # Explanation on how the code works:
+    # 1. Check if the accesion numbers already exists,  store it in the `pdb` variable
+    # 2. If the accessions do not exist, create a new pdb object and add it to the
+    #    session
+    # 3. Check if the pdb is already associated with the protein, and if not
+    #    create a new `proteinpdb` object and add it to the session
+    # 4. Commit the session to the database
+    
+    print(f"\nNow in {pdb_addition.__name__}")
+    print(f"Before query, {pdb=}")
+    
+    # Create a new pdb object
+    pdb = (
+        session.query(Pdb)
+        #.filter(Pdb.pdb_id == pdbid) Added automatically
+        .filter(Pdb.pdb_acc_1 == pdb_1)
+        .filter(Pdb.pdb_acc_2 == pdb_2)
+        .filter(Pdb.pdb_acc_3 == pdb_3)
+        .first
+    )
+    
+    print(f"After query, {pdb=}")
+    # Add a pdb if it is not already present
+    if not pdb:
+        pdb = Pdb(pdb_acc_1=pdb_1, pdb_acc_2=pdb_2, pdb_acc_3=pdb_3)
+        session.add(pdb)
+        session.flush()
+        print(f"Function {pdb_1}, {pdb_2}, {pdb_3}")
+    else:
+        print(f"This pdb {pdb_id} has already been added")
+    print(f"Pdb row returned: {pdb}")
+    print(f"{pdb.proteins=}, {type(pdb.proteins)}")
+    
+    if pdb not in pdb.proteins:
+        print(f"{protein.prot_id=}, {pdb.pdb_id=}")
+        proteinpdb = ProteinPdb()
+        print(f"{pdb.proteins=}")
+        proteinpdb.pdb = pdb
+        print(f"{proteinpdb}")
+        print(f"{pdb.proteins=}")
+        protein.pdbs.append(proteinpdb)
+        print(f"{pdb.proteins=}")
+        print(f"\nLinked Pdb {pdb.pdb_id} to Protein {protein.prot_id}")
+        print(f"{proteinpdb=}")
+    else:
+        print(f"Pdb {pdb.pdb_id} is already linked")
+    print(f"{pdb}")
+    
+    # # Create new enzyme path
+    # existing_path = (
+    #     session.query(Enzymepath)
+    #     # .filter(Enzymepath.path_id == pathid) Added automatically
+    #     .filter(Enzymepath.KO_ref == KOid)
+    #     .first
+    # )
+    # if not existing_path:
+    #     new_path = Enzymepath(KO_ref=KOid)
+    #     session.add(new_path)
+    #     session.commit()
+    #     if new_path not in prot.path:
+    #         prot.path.append(new_path)
+    #         session.commit()
+    #         print(f"Added EnzymePath {pathid} to Protein {protid}")
+    #     else:
+    #         print(f"EnzymePath {pathid} already associated with Protein {protid}")
+    # else:
+    #     print(f"Existing gene ontology reference {KOid}")
+
+    # print(pathid, KOid)
 
 def create_db(dbpath: Path):
     """Function to create all the tables from the database"""
