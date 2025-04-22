@@ -442,65 +442,62 @@ def gene_addition(session, NCBIid, dnaseq, protein):
 
     print(f"\nNow in {gene_addition.__name__}")
 
-    with session.no_autoflush:
-        # try:
-        print(f"Before query, {NCBIid=}, {dnaseq[:10]=}...")
+    #with session.no_autoflush:
+    print(f"Before query, {NCBIid=}, {dnaseq[:10]=}...")
 
-        # Create a new gene object
-        gene = (
-            session.query(Gene)
-            # gene_id automatically assigned
-            # DNA seq may not be unique as other llocus/species may have it
-            .filter(Gene.locus_NCBI_id == NCBIid)
-            .first()
+    # Create a new gene object
+    gene = (
+        session.query(Gene)
+        # gene_id automatically assigned
+        # DNA seq may not be unique as other llocus/species may have it
+        .filter(Gene.locus_NCBI_id == NCBIid)
+        .first()
+    )
+    # gene = (
+    #     session.query(Gene)
+    #     # gene_id automatically assigned
+    #     # DNA seq may not be unique as other llocus/species may have it
+    #     .filter(
+    #         or_(
+    #             Gene.locus_NCBI_id == NCBIid,  # When NCBIid is provided, filter by that
+    #             Gene.locus_NCBI_id.is_(None)   # If NCBIid is None, filter by NULL
+    #         )
+    #     )
+    #     .all()
+    # )
+    print(f"After query, {gene=}")
+
+    # Add gene if it is not already present
+    if not gene:
+        gene = Gene(locus_NCBI_id=NCBIid, dna_seq=dnaseq)
+        session.add(gene)
+        session.flush()
+        print(f"Gene {NCBIid=} added")
+    else:
+        print(f"This gene {NCBIid} has already being added")
+    print(f"Name row returned: {gene}")
+
+    # Associate the gene and protein information in the protein_gene
+    print(f"{gene.proteins=}, {type(gene.proteins)}")
+
+    if gene not in gene.proteins:
+        print(f"{protein.prot_id=}, {gene.gene_id=}")
+        proteingene = ProteinGene()
+        print(f"{gene.proteins=}")
+        proteingene.gene = gene
+        print(f"{proteingene=}")
+        print(f"{gene.proteins=}")
+        protein.genes.append(proteingene)
+        print(f"{gene.proteins=}")
+        print(f"\nLinked Gene {gene.gene_id} to Protein {protein.prot_id}")
+        print(f"{proteingene=}")
+    else:
+        print(
+            f"Gene name {gene.gene_id} is already linked to Protein {protein.prot_id}"
         )
-        # results = session.query(Gene.locus_NCBI_id).all()
-        # print(set([r[0] for r in results]))
-        # gene = (
-        #     session.query(Gene)
-        #     # gene_id automatically assigned
-        #     # DNA seq may not be unique as other llocus/species may have it
-        #     .filter(
-        #         or_(
-        #             Gene.locus_NCBI_id == NCBIid,  # When NCBIid is provided, filter by that
-        #             Gene.locus_NCBI_id.is_(None)   # If NCBIid is None, filter by NULL
-        #         )
-        #     )
-        #     .all()
-        # )
-        print(f"After query, {gene=}")
+    print(f"{gene}")
 
-        # Add gene if it is not already present
-        if not gene:
-            gene = Gene(locus_NCBI_id=NCBIid, dna_seq=dnaseq)
-            session.add(gene)
-            session.flush()
-            print(f"Gene {NCBIid=} added")
-        else:
-            print(f"This gene {NCBIid} has already being added")
-        print(f"Name row returned: {gene}")
-
-        # Associate the gene and protein information in the protein_gene
-        print(f"{gene.proteins=}, {type(gene.proteins)}")
-
-        if gene not in gene.proteins:
-            print(f"{protein.prot_id=}, {gene.gene_id=}")
-            proteingene = ProteinGene()
-            print(f"{gene.proteins=}")
-            proteingene.gene = gene
-            print(f"{proteingene=}")
-            print(f"{gene.proteins=}")
-            protein.genes.append(proteingene)
-            print(f"{gene.proteins=}")
-            print(f"\nLinked Gene {gene.gene_id} to Protein {protein.prot_id}")
-            print(f"{proteingene=}")
-        else:
-            print(
-                f"Gene name {gene.gene_id} is already linked to Protein {protein.prot_id}"
-            )
-        print(f"{gene}")
-        
-        return gene  # Return the gene row we just added to the db/otherwise dealt with
+    return gene  # Return the gene row we just added to the db/otherwise dealt with
 
 
 # Function for name data addition
@@ -670,6 +667,66 @@ def taxonomy_addition(
         #     print("Rolling back changes and skipping to next entry")
         #     session.rollback()
         return taxonomy  # Return the taxonomy row we just added to the db/otherwise dealt with
+
+# Function for name data addition
+def function_addition(session, goref, gotype, godescription, protein):
+    # Args:
+    # go_ref (str): GO reference ID from database.
+    # go_type (str): GO type in the database classification (MF, CC, BP).
+    # go_description (str) : text description of function provided by GO database
+    # protein: Protein information added with protein_addition function
+
+    # Explanation on how the code works:
+    # 1. Check if the go_ref already exists,  store it in the `name` variable
+    # 2. If the go_ref does not exist, create a new go_ref object and add it to the
+    #    session
+    # 3. Check if the go_ref is already associated with the protein, and if not
+    #    create a new `proteinfunction` object and add it to the session
+    # 4. Commit the session to the database
+
+    print(f"\nNow in {function_addition.__name__}")
+
+    with session.no_autoflush:
+        print(f"Before query, {goref=}")
+
+        # Create a new name object
+        function = (
+            session.query(Function)
+            # go_id automatically assigned
+            .filter(Function.go_ref == goref)
+            .first()
+        )
+        print(f"After query, {goref=}")
+
+        # Add function if it is not already present
+        if not function:
+            function = Function(go_ref=goref, go_type=gotype, go_description=godescription)
+            session.add(function)
+            session.flush()
+            print(f"Function {function=} added")
+        else:
+            print(f"This function {goref} has already being added")
+        print(f"Function row returned: {goref}")
+
+        if function not in function.proteins:
+            print(f"{protein.prot_id=}, {function.go_id=}")
+            proteinfunction = ProteinFunction()
+            print(f"{function.proteins=}")
+            proteinfunction.function = function
+            print(f"{proteinfunction=}")
+            print(f"{function.proteins=}")
+            protein.functions.append(proteinfunction)
+            print(f"{function.proteins=}")
+            print(f"Linked Function {function.go_id} to Protein {protein.prot_id}")
+            print(f"{proteinfunction=}")
+            session.flush()
+        else:
+            print(
+                f"Function {function.go_id} is already linked to Protein {protein.prot_id}"
+            )
+        print(f"{function.proteins=}, {type(function.proteins)}")
+        
+        return function
 
 
 def create_db(dbpath: Path):

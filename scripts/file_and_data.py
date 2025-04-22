@@ -7,7 +7,7 @@
 # To be able to make exceptions in code (try/except):
 # from sqlalchemy.exc import IntegrityError, PendingRollbackError
 # For exiting system for trouble shooting import sys
-from db import protein_addition, taxonomy_addition, name_addition, gene_addition
+from db import protein_addition, taxonomy_addition, name_addition, gene_addition, function_addition
 
 
 # Making a function for the addition of data to the different tables created with db.py following data_instructions:
@@ -42,6 +42,9 @@ def link_db_csv(mydata, session):
         pdb_3,
         pathid,
         KOid,
+        goref,
+        gotype,
+        godescription,
     ) in enumerate(mydata):
         # Check what data is available:
         print(f"\nStarting next loop ({idx=}) with {uniprot=}, {KOid=}")
@@ -95,6 +98,13 @@ def link_db_csv(mydata, session):
                 print(f"Name record returned: {name}")
                 print(f"Taxonomy record returned: {taxonomy}")
             session.commit()
+            
+            # Add function data
+            function = function_addition(
+                session, goref=goref, gotype=gotype, godescription=godescription, protein=protein
+            )
+            print(f"\nProtein record returned: {protein}")
+            print(f"Function record returned: {function}")
 
         except Exception as exc:
             print(f"Error adding data: {exc}")
