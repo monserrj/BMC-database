@@ -44,25 +44,46 @@ Session = sessionmaker()  # we also need a session object
 class ProteinName(Base):
     __tablename__ = "protein_name"
     prot_id: Mapped[int] = mapped_column(
-        ForeignKey("protein.prot_id"), primary_key=True
+        ForeignKey("protein.prot_id"), # primary_key=True
     )
     name_id: Mapped[int] = mapped_column(
-        ForeignKey("name.name_id"), primary_key=True
+        ForeignKey("name.name_id"), # primary_key=True
     )  # Not primary key as can be repeated
-    name_rank: Mapped[Optional[int]]
+    # name_rank: Mapped[Optional[int]]
     name: Mapped["Name"] = relationship(back_populates="proteins")
     protein: Mapped["Protein"] = relationship(back_populates="names")
-    # UniqueConstraint("prot_id", "name_id", "name_rank")
+    UniqueConstraint("prot_id", "name_id")
 
 class ProteinGene(Base):
     __tablename__ = "protein_gene"
     prot_id: Mapped[int] = mapped_column(
+        ForeignKey("protein.prot_id"), # primary_key=True
+    )
+    cds_id: Mapped[int] = mapped_column(ForeignKey("cds.cds_id"), primary_key=True)
+    cds: Mapped["cds"] = relationship(back_populates="proteins")
+    protein: Mapped["Protein"] = relationship(back_populates="cds")
+
+class ProteinXref(Base):
+    __tablename__ = "protein_xref"
+    prot_id: Mapped[int] = mapped_column(
         ForeignKey("protein.prot_id"), primary_key=True
     )
-    gene_id: Mapped[int] = mapped_column(ForeignKey("gene.gene_id"), primary_key=True)
-    gene: Mapped["Gene"] = relationship(back_populates="proteins")
-    protein: Mapped["Protein"] = relationship(back_populates="genes")
-    
+    xref_prot_id: Mapped[int] = mapped_column(
+        ForeignKey("xref_prot.xref_prot_id"), # primary_key=True
+    )  # Not primary key as can be repeated
+    xref_prot: Mapped["Xref_prot"] = relationship(back_populates="proteins")
+    protein: Mapped["Protein"] = relationship(back_populates="xref_prots")
+
+class GeneXref(Base):
+    __tablename__ = "gene_xref"
+    cds_id: Mapped[int] = mapped_column(
+        ForeignKey("cds.cds_id"), primary_key=True
+    )
+    gref_id: Mapped[int] = mapped_column(ForeignKey("gref.gref_id"), # primary_key=True
+    )
+    gref: Mapped["Gref"] = relationship(back_populates="genes")
+    gene: Mapped["Cds"] = relationship(back_populates="grefs")
+
 class ProteinTaxonomy(Base):
     __tablename__ = "protein_taxonomy"
     prot_id: Mapped[int] = mapped_column(
@@ -152,7 +173,8 @@ class Protein(Base):
     __tablename__ = "protein"  # this is the name that will be used in SQLite
     # Introduce all relationship between tables:
     names: Mapped[list["ProteinName"]] = relationship()
-    genes: Mapped[list["ProteinGene"]] = relationship()
+    cds: Mapped[list["ProteinGene"]] = relationship()
+    xref_prots: Mapped[list["ProteinXref"]] = relationship()
     taxonomies: Mapped[list["ProteinTaxonomy"]] = relationship()
     pdbs: Mapped[list["ProteinPdb"]] = relationship()
     domains: Mapped[list["ProteinDomain"]] = relationship()
@@ -164,41 +186,60 @@ class Protein(Base):
     # Define table content:
     prot_id = Column(Integer, primary_key=True, autoincrement=True)
     prot_seq = Column(String, nullable=False, unique=True)
-    uniprot_id = Column(String, unique=True, nullable=True)
+    # uniprot_id = Column(String, unique=True, nullable=True)
     struct_prot_type = Column(Integer, nullable=True)
-
-    # Introduce back_populates so when a relationship between different tables is
-    # introduced, they information will be back-populated to be consistent across
-    # all tables. Relationships must be introduced in both related tables (e.g.:
-    # Gene and Protein, with relationship based on table ProteinGene)
-    # complexes = relationship(
-    #     "Complex", secondary=proteincomplex, back_populates="proteins", lazy="dynamic"
-    #     )
-    # interacts = relationship(
-    #     "Protprotinteract",  secondary=proteincomplex, back_populates="proteins", lazy="dynamic"
-    #     )
+    
     # Define type of output for protein
     def __str__(self):
         outstr = [
             f"Protein ID: {self.prot_id}",
             f"Protein sequence: {self.prot_seq}",
-            f"Uniprot ID: {self.uniprot_id}",
+            # f"Uniprot ID: {self.uniprot_id}",
             f"Protein structure type: {self.struct_prot_type}",
         ]
         return "\n".join(outstr)
 
-class Gene(Base): # New addition for testing gen table
+class Xref_prot(Base): # New addition for testing xref table
+    """Table representing the protein details from different db
+    """
+    
+    __tablename__ = "xref_prot"
+    # Introduce all relationship between tables:
+    proteins: Mapped[list["ProteinXref"]] = relationship()
+    # Define table content:
+    xref_prot_id = Column(Integer, primary_key=True, autoincrement=True)
+    db_id = Column(String, nullable=False, unique=True) # The external db accession
+    db_name = Column(String, nullable=False) # Original db of external db accession
+    db_URL = Column(String, nullable=True) # The external db URL
+
+class Cds(Base): # New addition for testing gen table
     """Table representing the gene details linked to a protein
-    This table will store the gene ID, DNA sequence, and NCBI locus
+    This table will store the gene ID, DNA sequence, and type of
+    sequences, e.g: mutated, optimised, native...
     """
 
-    __tablename__ = "gene"
+    __tablename__ = "cds"
     # Introduce all relationship between tables:
     proteins: Mapped[list["ProteinGene"]] = relationship()
+    grefs: Mapped[list["GeneXref"]] = relationship()
     # Define table content:
-    gene_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
-    locus_NCBI_id = Column(String, unique=True, nullable=True)
+    cds_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
+    # locus_NCBI_id = Column(String, unique=True, nullable=True)
     dna_seq = Column(String, nullable=False, unique=True)  
+    cds_type = Column(String, nullable=True, unique = False)
+
+class Gref(Base): # New addition for testing xref table
+    """Table representing the gene details linked to NCBI locus
+    """
+    
+    __tablename__ = "gref"
+    # Introduce all relationship between tables:
+    genes: Mapped[list["GeneXref"]] = relationship()
+    # Define table content:
+    gref_id = Column(Integer, primary_key=True, autoincrement=True)
+    accession_id = Column(String, nullable=False, unique=True) # The external db accession
+    db_name = Column(String, nullable=False) # Original db of external db accession
+    db_URL = Column(String, nullable=True) # The external db URL
 
 class Name(Base):
     """Table representing a gene name
@@ -426,79 +467,126 @@ def protein_addition(session, protseq, uniprot, struct):
         protein  # Return the protein row we just added to the db/otherwise dealt with
     )
 
-def gene_addition(session, NCBIid, dnaseq, protein):
+def cds_addition(session, dnaseq, cdstype, protein):
     # Args:
-    # NCBIid (str): NCBI locus ID.
     # dnaseq (str): Gene DNA sequence.
+    # cds_type (str): Type of cds (mutated, optimised, native...)
     # protein: Protein information added with protein_addition function
 
     # Explanation on how the code works:
-    # 1. Check if the gene already exists,  store it in the `gene` variable
-    # 2. If the gene does not exist, create a new gene object and add it to the
+    # 1. Check if the cds already exists,  store it in the `cds` variable
+    # 2. If the cds does not exist, create a new cds object and add it to the
     #    session
-    # 3. Check if the gene is already associated with the protein, and if not
+    # 3. Check if the cds is already associated with the protein, and if not
     #    create a new `proteingene` object and add it to the session
     # 4. Commit the session to the database
 
-    print(f"\nNow in {gene_addition.__name__}")
+    print(f"\nNow in {cds_addition.__name__}")
 
     #with session.no_autoflush:
-    print(f"Before query, {NCBIid=}, {dnaseq[:10]=}...")
+    print(f"Before query, {dnaseq[:10]=}..., {cdstype=}")
 
-    # Create a new gene object
-    gene = (
-        session.query(Gene)
-        # gene_id automatically assigned
-        # DNA seq may not be unique as other llocus/species may have it
-        .filter(Gene.locus_NCBI_id == NCBIid)
+    # Create a new cds object
+    cds = (
+        session.query(Cds)
+        # cds_id automatically assigned
+        .filter(Cds.dna_seq == dnaseq)
         .first()
     )
-    # gene = (
-    #     session.query(Gene)
-    #     # gene_id automatically assigned
-    #     # DNA seq may not be unique as other llocus/species may have it
-    #     .filter(
-    #         or_(
-    #             Gene.locus_NCBI_id == NCBIid,  # When NCBIid is provided, filter by that
-    #             Gene.locus_NCBI_id.is_(None)   # If NCBIid is None, filter by NULL
-    #         )
-    #     )
-    #     .all()
-    # )
-    print(f"After query, {gene=}")
+    print(f"After query, {cds=}")
 
-    # Add gene if it is not already present
-    if not gene:
-        gene = Gene(locus_NCBI_id=NCBIid, dna_seq=dnaseq)
-        session.add(gene)
+    # Add cds if it is not already present
+    if not cds:
+        cds = Cds(dna_seq=dnaseq, cds_type=cdstype)
+        session.add(cds)
         session.flush()
-        print(f"Gene {NCBIid=} added")
+        print(f"Cds {dnaseq[:10]=} added")
     else:
-        print(f"This gene {NCBIid} has already being added")
-    print(f"Name row returned: {gene}")
+        print(f"This CDS {dnaseq[:10]=} has already being added")
+    print(f"Cds row returned: {cds}")
 
-    # Associate the gene and protein information in the protein_gene
-    print(f"{gene.proteins=}, {type(gene.proteins)}")
+    # Associate the cds and protein information in the protein_gene
+    print(f"{cds.proteins=}, {type(cds.proteins)}")
 
-    if gene not in gene.proteins:
-        print(f"{protein.prot_id=}, {gene.gene_id=}")
+    if cds not in cds.proteins:
+        print(f"{protein.prot_id=}, {cds.cds_id=}")
         proteingene = ProteinGene()
-        print(f"{gene.proteins=}")
-        proteingene.gene = gene
+        print(f"{cds.proteins=}")
+        proteingene.cds = cds
         print(f"{proteingene=}")
-        print(f"{gene.proteins=}")
-        protein.genes.append(proteingene)
-        print(f"{gene.proteins=}")
-        print(f"\nLinked Gene {gene.gene_id} to Protein {protein.prot_id}")
+        print(f"{cds.proteins=}")
+        protein.cds.append(proteingene)
+        print(f"{cds.proteins=}")
+        print(f"\nLinked Gene {cds.cds_id} to Protein {protein.prot_id}")
         print(f"{proteingene=}")
     else:
         print(
-            f"Gene name {gene.gene_id} is already linked to Protein {protein.prot_id}"
+            f"CDS  {cds.cds_id} is already linked to Protein {protein.prot_id}"
         )
-    print(f"{gene}")
+    print(f"{cds}")
 
-    return gene  # Return the gene row we just added to the db/otherwise dealt with
+    return cds  # Return the cds row we just added to the db/otherwise dealt with
 
+def gref_addition(session, accessionid, dbname, dburl, cds):
+    # Args:
+    # accessionid (str): Accession locus ID.
+    # dbname (str): Database name of the accession number reference.
+    # dburl (str): Database URL,
+    # protein: Protein information added with protein_addition function.
+
+    # Explanation on how the code works:
+    # 1. Check if the gene_xref already exists,  store it in the `gene_xref` variable
+    # 2. If the gene_xref does not exist, create a new gene_xref object and add it to the
+    #    session
+    # 3. Check if the gene_xref is already associated with the gene (cds), and if not
+    #    create a new `gene_xref` object and add it to the session
+    # 4. Commit the session to the database
+
+    print(f"\nNow in {gref_addition.__name__}")
+
+    #with session.no_autoflush:
+    print(f"Before query, {accessionid=}, {dbname=}, {dburl[:10]=}...")
+
+    # Create a new gene_xref object
+    gene_xref = (
+        session.query(Gref)
+        # xref_gene_id automatically assigned
+        .filter(Gref.accession_id == accessionid)
+        .first()
+    )
+    print(f"After query, {gene_xref=}")
+
+    # Add gene_xref if it is not already present
+    if not gene_xref:
+        gene_xref = Gref(accession_id=accessionid, db_name=dbname, db_URL=dburl)
+        session.add(gene_xref)
+        session.flush()
+        print(f"Locus reference {accessionid=} added")
+    else:
+        print(f"This locus reference {accessionid} has already being added")
+    print(f"Locus reference row returned: {gene_xref}")
+
+    # Associate the locus reference and gene information in the gene_xref
+    print(f"{gref.genes=}, {type(gref.genes)}")
+
+    if gene_xref not in gref.genes:
+        print(f"{cds.cds_id=}, {gref.gref_id=}")
+        genexref = GeneXref()
+        print(f"{gref.genes=}")
+        genexref.gene_xref = gene_xref
+        print(f"{genexref=}")
+        print(f"{gref.genes=}")
+        cds.grefs.append(genexref)
+        print(f"{gref.genes=}")
+        print(f"\nLinked Locus {gref.gref_id} to gene cds {cds.cds_id}")
+        print(f"{genexref=}")
+    else:
+        print(
+            f"Gene locus reference {gref.gref_id} is already linked to Gene {cds.cds_id}"
+        )
+    print(f"{gene_xref}")
+
+    return gene_xref  # Return the locus row we just added to the db/otherwise dealt with
 
 # Function for name data addition
 def name_addition(session, genename, namerank, protein):
@@ -579,232 +667,232 @@ def name_addition(session, genename, namerank, protein):
         return name  # Return the gene row we just added to the db/otherwise dealt with
 
 
-# Function for taxonomy data addition:
-def taxonomy_addition(
-    session, taxref, taxdb, spec, genu, fam, order, phyl, classt, stra, protein
-):
-    # Args:
-    # taxref (str): Taxonomy reference ID
-    # taxdb (str): Taxonomy database used for reference ID
-    # spec (str): Specie (taxonomy classification)
-    # genu (str): Genus (taxonomy classification)
-    # fam (str): Family (taxonomy classification)
-    # order (str): Order (taxonomy classification)
-    # phyl (str): Phylogeny (taxonomy classification)
-    # classt (str): Class (taxonomy classification)
-    # stra (str): Strain (taxonomy classification)
-    # protein: Protein information added with protein_addition function
+# # Function for taxonomy data addition:
+# def taxonomy_addition(
+#     session, taxref, taxdb, spec, genu, fam, order, phyl, classt, stra, protein
+# ):
+#     # Args:
+#     # taxref (str): Taxonomy reference ID
+#     # taxdb (str): Taxonomy database used for reference ID
+#     # spec (str): Specie (taxonomy classification)
+#     # genu (str): Genus (taxonomy classification)
+#     # fam (str): Family (taxonomy classification)
+#     # order (str): Order (taxonomy classification)
+#     # phyl (str): Phylogeny (taxonomy classification)
+#     # classt (str): Class (taxonomy classification)
+#     # stra (str): Strain (taxonomy classification)
+#     # protein: Protein information added with protein_addition function
 
-    # Explanation on how the code works:
-    # 1. Check if the taxonomy already exists, and if so store it in the `tax`
-    #    variable
-    # 2. If the taxonomy does not exist, create a new gene object and add it to the
-    #    session
-    # 3. Then check if the taxonomy is already associated with the protein being added, and if not
-    #    create a new `proteintax` object and add it to the session
-    # 4. Commit the session to the database
+#     # Explanation on how the code works:
+#     # 1. Check if the taxonomy already exists, and if so store it in the `tax`
+#     #    variable
+#     # 2. If the taxonomy does not exist, create a new gene object and add it to the
+#     #    session
+#     # 3. Then check if the taxonomy is already associated with the protein being added, and if not
+#     #    create a new `proteintax` object and add it to the session
+#     # 4. Commit the session to the database
 
-    print(f"\nNow in {taxonomy_addition.__name__}")
+#     print(f"\nNow in {taxonomy_addition.__name__}")
 
-    # LP: Had to turn off autoflushing to suppress an error here
-    # See https://github.com/sqlalchemy/sqlalchemy/discussions/12049=
-    with session.no_autoflush:
-        print(
-            f"Before query, {taxref=}, {taxdb=}, {spec=}, {genu=}, {fam=}, {order=}, {phyl=}, {classt=}, {stra=}"
-        )
-        # Create a new taxonomy object
-        taxonomy = session.query(Taxonomy).filter(Taxonomy.tax_ref == taxref).first()
-        print(f"After query, {taxonomy=}")
+#     # LP: Had to turn off autoflushing to suppress an error here
+#     # See https://github.com/sqlalchemy/sqlalchemy/discussions/12049=
+#     with session.no_autoflush:
+#         print(
+#             f"Before query, {taxref=}, {taxdb=}, {spec=}, {genu=}, {fam=}, {order=}, {phyl=}, {classt=}, {stra=}"
+#         )
+#         # Create a new taxonomy object
+#         taxonomy = session.query(Taxonomy).filter(Taxonomy.tax_ref == taxref).first()
+#         print(f"After query, {taxonomy=}")
 
-        # Add taxonomy if it is not already present
-        if not taxonomy:
-            taxonomy = Taxonomy(
-                tax_ref=taxref,
-                tax_db=taxdb,
-                species=spec,
-                genus=genu,
-                family=fam,
-                order_tax=order,
-                phylum=phyl,
-                class_tax=classt,
-                strain=stra,
-            )
-            session.add(taxonomy)
-            session.flush()
-            print(f"Taxonomy {taxref=} added")
-        else:
-            print(f"This taxonomy {taxref} already exists")
+#         # Add taxonomy if it is not already present
+#         if not taxonomy:
+#             taxonomy = Taxonomy(
+#                 tax_ref=taxref,
+#                 tax_db=taxdb,
+#                 species=spec,
+#                 genus=genu,
+#                 family=fam,
+#                 order_tax=order,
+#                 phylum=phyl,
+#                 class_tax=classt,
+#                 strain=stra,
+#             )
+#             session.add(taxonomy)
+#             session.flush()
+#             print(f"Taxonomy {taxref=} added")
+#         else:
+#             print(f"This taxonomy {taxref} already exists")
 
-        print(f"Taxonomy row returned: {taxonomy}")
+#         print(f"Taxonomy row returned: {taxonomy}")
 
-        # Associate the taxonomy with the protein information in the protein_tax table
-        print(f"{taxonomy.proteins=}, {type(taxonomy.proteins)}")
+#         # Associate the taxonomy with the protein information in the protein_tax table
+#         print(f"{taxonomy.proteins=}, {type(taxonomy.proteins)}")
 
-        if taxonomy not in taxonomy.proteins:
-            print(f"{protein.prot_id=}, {taxonomy.tax_id=}")
-            proteintaxonomy = ProteinTaxonomy()
-            print(f"{taxonomy.proteins=}")
-            proteintaxonomy.taxonomy = taxonomy
-            print(f"{proteintaxonomy=}")
-            print(f"{taxonomy.proteins=}")
-            protein.taxonomies.append(proteintaxonomy)
-            print(f"{taxonomy.proteins=}")
-            print(f"Linked Taxonomy {taxonomy.tax_id} to Protein {protein.prot_id}")
-            print(f"{proteintaxonomy=}")
-            session.flush()
-        else:
-            print(
-                f"Taxonomy {taxonomy.tax_id} is already linked to Protein {protein.prot_id}"
-            )
-        print(f"{taxref}, {spec}, {stra}")
+#         if taxonomy not in taxonomy.proteins:
+#             print(f"{protein.prot_id=}, {taxonomy.tax_id=}")
+#             proteintaxonomy = ProteinTaxonomy()
+#             print(f"{taxonomy.proteins=}")
+#             proteintaxonomy.taxonomy = taxonomy
+#             print(f"{proteintaxonomy=}")
+#             print(f"{taxonomy.proteins=}")
+#             protein.taxonomies.append(proteintaxonomy)
+#             print(f"{taxonomy.proteins=}")
+#             print(f"Linked Taxonomy {taxonomy.tax_id} to Protein {protein.prot_id}")
+#             print(f"{proteintaxonomy=}")
+#             session.flush()
+#         else:
+#             print(
+#                 f"Taxonomy {taxonomy.tax_id} is already linked to Protein {protein.prot_id}"
+#             )
+#         print(f"{taxref}, {spec}, {stra}")
 
-        #     # Try to commit our changes;
-        #     print("Committing changes")
-        #     session.commit()
+#         #     # Try to commit our changes;
+#         #     print("Committing changes")
+#         #     session.commit()
 
-        # except Exception as exc:
-        #     print(f"Error committing protein/gene combination: {exc}")
-        #     print("Rolling back changes and skipping to next entry")
-        #     session.rollback()
-        return taxonomy  # Return the taxonomy row we just added to the db/otherwise dealt with
+#         # except Exception as exc:
+#         #     print(f"Error committing protein/gene combination: {exc}")
+#         #     print("Rolling back changes and skipping to next entry")
+#         #     session.rollback()
+#         return taxonomy  # Return the taxonomy row we just added to the db/otherwise dealt with
 
-# Function for name data addition
-def function_addition(session, goref, gotype, godescription, protein):
-    # Args:
-    # go_ref (str): GO reference ID from database.
-    # go_type (str): GO type in the database classification (MF, CC, BP).
-    # go_description (str) : text description of function provided by GO database
-    # protein: Protein information added with protein_addition function
+# # Function for name data addition
+# def function_addition(session, goref, gotype, godescription, protein):
+#     # Args:
+#     # go_ref (str): GO reference ID from database.
+#     # go_type (str): GO type in the database classification (MF, CC, BP).
+#     # go_description (str) : text description of function provided by GO database
+#     # protein: Protein information added with protein_addition function
 
-    # Explanation on how the code works:
-    # 1. Check if the go_ref already exists,  store it in the `name` variable
-    # 2. If the go_ref does not exist, create a new go_ref object and add it to the
-    #    session
-    # 3. Check if the go_ref is already associated with the protein, and if not
-    #    create a new `proteinfunction` object and add it to the session
-    # 4. Commit the session to the database
+#     # Explanation on how the code works:
+#     # 1. Check if the go_ref already exists,  store it in the `name` variable
+#     # 2. If the go_ref does not exist, create a new go_ref object and add it to the
+#     #    session
+#     # 3. Check if the go_ref is already associated with the protein, and if not
+#     #    create a new `proteinfunction` object and add it to the session
+#     # 4. Commit the session to the database
 
-    print(f"\nNow in {function_addition.__name__}")
+#     print(f"\nNow in {function_addition.__name__}")
 
-    with session.no_autoflush:
-        print(f"Before query, {goref=}")
+#     with session.no_autoflush:
+#         print(f"Before query, {goref=}")
 
-        # Create a new name object
-        function = (
-            session.query(Function)
-            # go_id automatically assigned
-            .filter(Function.go_ref == goref)
-            .first()
-        )
-        print(f"After query, {goref=}")
+#         # Create a new name object
+#         function = (
+#             session.query(Function)
+#             # go_id automatically assigned
+#             .filter(Function.go_ref == goref)
+#             .first()
+#         )
+#         print(f"After query, {goref=}")
 
-        # Add function if it is not already present
-        if not function:
-            function = Function(go_ref=goref, go_type=gotype, go_description=godescription)
-            session.add(function)
-            session.flush()
-            print(f"Function {function=} added")
-        else:
-            print(f"This function {goref} has already being added")
-        print(f"Function row returned: {goref}")
+#         # Add function if it is not already present
+#         if not function:
+#             function = Function(go_ref=goref, go_type=gotype, go_description=godescription)
+#             session.add(function)
+#             session.flush()
+#             print(f"Function {function=} added")
+#         else:
+#             print(f"This function {goref} has already being added")
+#         print(f"Function row returned: {goref}")
 
-        if function not in function.proteins:
-            print(f"{protein.prot_id=}, {function.go_id=}")
-            proteinfunction = ProteinFunction()
-            print(f"{function.proteins=}")
-            proteinfunction.function = function
-            print(f"{proteinfunction=}")
-            print(f"{function.proteins=}")
-            protein.functions.append(proteinfunction)
-            print(f"{function.proteins=}")
-            print(f"Linked Function {function.go_id} to Protein {protein.prot_id}")
-            print(f"{proteinfunction=}")
-            session.flush()
-        else:
-            print(
-                f"Function {function.go_id} is already linked to Protein {protein.prot_id}"
-            )
-        print(f"{function.proteins=}, {type(function.proteins)}")
+#         if function not in function.proteins:
+#             print(f"{protein.prot_id=}, {function.go_id=}")
+#             proteinfunction = ProteinFunction()
+#             print(f"{function.proteins=}")
+#             proteinfunction.function = function
+#             print(f"{proteinfunction=}")
+#             print(f"{function.proteins=}")
+#             protein.functions.append(proteinfunction)
+#             print(f"{function.proteins=}")
+#             print(f"Linked Function {function.go_id} to Protein {protein.prot_id}")
+#             print(f"{proteinfunction=}")
+#             session.flush()
+#         else:
+#             print(
+#                 f"Function {function.go_id} is already linked to Protein {protein.prot_id}"
+#             )
+#         print(f"{function.proteins=}, {type(function.proteins)}")
         
-        return function
+#         return function
 
-# Create new pdb
-def pdb_addition(session, pdb_acc_1, pdb_acc_2, pdb_acc_3, protein):
-    # Args:
-    # pdb_acc_1 (str): Accesion number 1 for pdb reference
-    # pdb_acc_2 (str): Accesion number 2 for pdb reference
-    # pdb_acc_3 (str): Accesion number 3 for pdb reference
-    # protein: Protein information added with protein_addition function
+# # Create new pdb
+# def pdb_addition(session, pdb_acc_1, pdb_acc_2, pdb_acc_3, protein):
+#     # Args:
+#     # pdb_acc_1 (str): Accesion number 1 for pdb reference
+#     # pdb_acc_2 (str): Accesion number 2 for pdb reference
+#     # pdb_acc_3 (str): Accesion number 3 for pdb reference
+#     # protein: Protein information added with protein_addition function
 
-    # Explanation on how the code works:
-    # 1. Check if the accesion numbers already exists,  store it in the `pdb` variable
-    # 2. If the accessions do not exist, create a new pdb object and add it to the
-    #    session
-    # 3. Check if the pdb is already associated with the protein, and if not
-    #    create a new `proteinpdb` object and add it to the session
-    # 4. Commit the session to the database
+#     # Explanation on how the code works:
+#     # 1. Check if the accesion numbers already exists,  store it in the `pdb` variable
+#     # 2. If the accessions do not exist, create a new pdb object and add it to the
+#     #    session
+#     # 3. Check if the pdb is already associated with the protein, and if not
+#     #    create a new `proteinpdb` object and add it to the session
+#     # 4. Commit the session to the database
     
-    print(f"\nNow in {pdb_addition.__name__}")
-    print(f"Before query, {pdb=}")
+#     print(f"\nNow in {pdb_addition.__name__}")
+#     print(f"Before query, {pdb=}")
     
-    # Create a new pdb object
-    pdb = (
-        session.query(Pdb)
-        #.filter(Pdb.pdb_id == pdbid) Added automatically
-        .filter(Pdb.pdb_acc_1 == pdb_1)
-        .filter(Pdb.pdb_acc_2 == pdb_2)
-        .filter(Pdb.pdb_acc_3 == pdb_3)
-        .first
-    )
+#     # Create a new pdb object
+#     pdb = (
+#         session.query(Pdb)
+#         #.filter(Pdb.pdb_id == pdbid) Added automatically
+#         .filter(Pdb.pdb_acc_1 == pdb_1)
+#         .filter(Pdb.pdb_acc_2 == pdb_2)
+#         .filter(Pdb.pdb_acc_3 == pdb_3)
+#         .first
+#     )
     
-    print(f"After query, {pdb=}")
-    # Add a pdb if it is not already present
-    if not pdb:
-        pdb = Pdb(pdb_acc_1=pdb_1, pdb_acc_2=pdb_2, pdb_acc_3=pdb_3)
-        session.add(pdb)
-        session.flush()
-        print(f"Function {pdb_1}, {pdb_2}, {pdb_3}")
-    else:
-        print(f"This pdb {pdb_id} has already been added")
-    print(f"Pdb row returned: {pdb}")
-    print(f"{pdb.proteins=}, {type(pdb.proteins)}")
+#     print(f"After query, {pdb=}")
+#     # Add a pdb if it is not already present
+#     if not pdb:
+#         pdb = Pdb(pdb_acc_1=pdb_1, pdb_acc_2=pdb_2, pdb_acc_3=pdb_3)
+#         session.add(pdb)
+#         session.flush()
+#         print(f"Function {pdb_1}, {pdb_2}, {pdb_3}")
+#     else:
+#         print(f"This pdb {pdb_id} has already been added")
+#     print(f"Pdb row returned: {pdb}")
+#     print(f"{pdb.proteins=}, {type(pdb.proteins)}")
     
-    if pdb not in pdb.proteins:
-        print(f"{protein.prot_id=}, {pdb.pdb_id=}")
-        proteinpdb = ProteinPdb()
-        print(f"{pdb.proteins=}")
-        proteinpdb.pdb = pdb
-        print(f"{proteinpdb}")
-        print(f"{pdb.proteins=}")
-        protein.pdbs.append(proteinpdb)
-        print(f"{pdb.proteins=}")
-        print(f"\nLinked Pdb {pdb.pdb_id} to Protein {protein.prot_id}")
-        print(f"{proteinpdb=}")
-    else:
-        print(f"Pdb {pdb.pdb_id} is already linked")
-    print(f"{pdb}")
+#     if pdb not in pdb.proteins:
+#         print(f"{protein.prot_id=}, {pdb.pdb_id=}")
+#         proteinpdb = ProteinPdb()
+#         print(f"{pdb.proteins=}")
+#         proteinpdb.pdb = pdb
+#         print(f"{proteinpdb}")
+#         print(f"{pdb.proteins=}")
+#         protein.pdbs.append(proteinpdb)
+#         print(f"{pdb.proteins=}")
+#         print(f"\nLinked Pdb {pdb.pdb_id} to Protein {protein.prot_id}")
+#         print(f"{proteinpdb=}")
+#     else:
+#         print(f"Pdb {pdb.pdb_id} is already linked")
+#     print(f"{pdb}")
     
-    # # Create new enzyme path
-    # existing_path = (
-    #     session.query(Enzymepath)
-    #     # .filter(Enzymepath.path_id == pathid) Added automatically
-    #     .filter(Enzymepath.KO_ref == KOid)
-    #     .first
-    # )
-    # if not existing_path:
-    #     new_path = Enzymepath(KO_ref=KOid)
-    #     session.add(new_path)
-    #     session.commit()
-    #     if new_path not in prot.path:
-    #         prot.path.append(new_path)
-    #         session.commit()
-    #         print(f"Added EnzymePath {pathid} to Protein {protid}")
-    #     else:
-    #         print(f"EnzymePath {pathid} already associated with Protein {protid}")
-    # else:
-    #     print(f"Existing gene ontology reference {KOid}")
+#     # # Create new enzyme path
+#     # existing_path = (
+#     #     session.query(Enzymepath)
+#     #     # .filter(Enzymepath.path_id == pathid) Added automatically
+#     #     .filter(Enzymepath.KO_ref == KOid)
+#     #     .first
+#     # )
+#     # if not existing_path:
+#     #     new_path = Enzymepath(KO_ref=KOid)
+#     #     session.add(new_path)
+#     #     session.commit()
+#     #     if new_path not in prot.path:
+#     #         prot.path.append(new_path)
+#     #         session.commit()
+#     #         print(f"Added EnzymePath {pathid} to Protein {protid}")
+#     #     else:
+#     #         print(f"EnzymePath {pathid} already associated with Protein {protid}")
+#     # else:
+#     #     print(f"Existing gene ontology reference {KOid}")
 
-    # print(pathid, KOid)
+#     # print(pathid, KOid)
 
 def create_db(dbpath: Path):
     """Function to create all the tables from the database"""
