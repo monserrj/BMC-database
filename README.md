@@ -6,7 +6,7 @@ Space designed to create the Bacterial microcompartment database. This database 
 
 There is an ER diagram of the current design at the link below:
 
-- [https://dbdiagram.io/d/BMC_db-6679263e9939893dae12efc0](https://dbdiagram.io/d/BMC_db-6679263e9939893dae12efc0)
+- [https://dbdiagram.io/d/DB_STRUCTURE_052025-682494635b2fc4582f9453e4]
 
 ## TABLE OF CONTENT
 
