@@ -48,7 +48,6 @@ class Protein(Base):
     # Introduce all relationship between tables:
     # names: Mapped[list["ProteinName"]] = relationship()
     # cds: Mapped[list["Cds"]] = relationship()
-    # xref_prots: Mapped[list["ProteinXref"]] = relationship()
 
     # I am sure this is wrong, fix when TS
     # isoforms: Mapped[list["Isoforms"]] = relationship()
@@ -132,6 +131,44 @@ class ProteinXref(Base):
     protein: Mapped["Protein"] = relationship(back_populates="references")
     xref: Mapped["Xref"] = relationship(back_populates="proteins")
 
+class Cds(Base):
+    """Table representing the gene details linked to a protein
+    This table will store the gene ID, DNA sequence, 
+    origin sequences if engineered, accession number and the corresponding
+    protein
+    """
+
+    __tablename__ = "cds"
+
+    #Define table content:
+    cds_id = Column(Integer, primary_key=True)
+    cds_seq = Column(String, nullable=False, unique=True)
+    cds_accession = Column(
+        String, nullable=False, unique=True
+    )  # Unique accession number for CDS
+    
+    prot_id : Mapped[int] = mapped_column(
+        ForeignKey("protein.prot_id"), nullable=False
+        ) 
+
+    cds_origin : Mapped[int] = mapped_column(
+        ForeignKey("cds.cds_id"), nullable=True
+    ) # Foreign key, origin DNA sequence (cds_id key)
+    
+    protein: Mapped["Protein"] = relationship(back_populates="cds")
+    origin : Mapped["Cds"] = relationship(back_populates="cds", remote_side=[cds_id], post_update=True)
+    # It says to add this as self-referential foreign key
+    # https://docs.sqlalchemy.org/en/20/orm/self_referential.html
+
+
+
+
+
+
+
+
+
+
 
 def create_db(dbpath: Path):
     """Function to create all the tables from the database"""
@@ -153,6 +190,15 @@ def get_session(dbpath: Path):
 
 if __name__ == "__main__":
     create_db(Path("db-lp.sqlite3"))
+
+
+
+
+
+
+
+
+
 
 
 ## How to populate parent child relationships for CDS

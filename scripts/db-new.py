@@ -58,7 +58,7 @@ class Isoforms (Base):
     #Recheck how this works as right now is wrong
     isoform : Mapped["Protein"] = relationship(back_populates="isoforms")
     canonical: Mapped["Protein"] = relationship(back_populates="canonicals") # Recheck this
-
+'''
 class Xref(Base): # All external references
     """Table representing the protein and CDS details from different db
     """
@@ -89,8 +89,6 @@ class ProteinXref(Base):
     xref: Mapped["Xref"] = relationship(back_populates="proteins")
     UniqueConstraint("prot_id", "xref_id")
 
-
-# Unsure whther class Cds goes here or below
 class Cds(Base):
     """Table representing the gene details linked to a protein
     This table will store the gene ID, DNA sequence, 
@@ -118,6 +116,7 @@ class Cds(Base):
     origin : Mapped["Cds"] = relationship(back_populates="cds", remote_side=[cds_id], post_update=True)
     # It says to add this as self-referential foreign key
     # https://docs.sqlalchemy.org/en/20/orm/self_referential.html
+'''
 
 class CdsXref(Base):
     __tablename__ = "cds_xref"
@@ -161,6 +160,7 @@ class CdsModif(Base):
 # this gets done after the tables are created.
 # Each class inherits from the Base class we created earlier.
 
+'''
 class Protein(Base):
     """Table representing a protein This table will store the protein sequence, 
     unique accession number, type of protein structure and whether is
@@ -197,7 +197,7 @@ class Protein(Base):
             f"Protein is canonical: {self.is_canonical}",
         ]
         return "\n".join(outstr)
-
+'''
 class Name(Base):
     """Table representing a gene name
     Each gene_ID represents a protein name. Several name strings
@@ -212,7 +212,7 @@ class Name(Base):
         Integer, primary_key=True, autoincrement=True
     )  # primary key column
     prot_name = Column(String, nullable=False)
-
+'''
 class XrefIndex(Base):
     """Index table for all external databases"""
     
@@ -224,7 +224,7 @@ class XrefIndex(Base):
     xref_db = Column(String, nullable=False, unique=True) # Database name
     xref_href = Column(String, nullable=False, unique=True) # URL for database access
     xref_type = Column (String, nullable=False) # types of database: seq, struct, funct, tax'
-
+'''
 class Modif(Base):
     """Table representing the modification of the engineered CDS sequences
     """
@@ -567,7 +567,7 @@ def xref_addition(session, db, cds, protein, xrefacc):
 
     return xref  # Return the renference row we just added to the db/otherwise dealt with
 
-
+'''
 def create_db(dbpath: Path):
     """Function to create all the tables from the database"""
     # Create a database engine to connect to the database.
@@ -588,3 +588,4 @@ def get_session(dbpath: Path):
 
 if __name__ == "__main__":
     create_db()
+'''
