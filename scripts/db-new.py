@@ -38,6 +38,7 @@ Session = sessionmaker()  # we also need a session object
 # Create the tables in the database.
 # Tables with one-to-many and many-to-many relationships must be created
 # before creating other tables, to satisfy the logic of the code.
+'''
 class ProteinName(Base):
     __tablename__ = "protein_name"
     prot_id: Mapped[int] = mapped_column(
@@ -58,7 +59,6 @@ class Isoforms (Base):
     #Recheck how this works as right now is wrong
     isoform : Mapped["Protein"] = relationship(back_populates="isoforms")
     canonical: Mapped["Protein"] = relationship(back_populates="canonicals") # Recheck this
-'''
 class Xref(Base): # All external references
     """Table representing the protein and CDS details from different db
     """
@@ -116,7 +116,6 @@ class Cds(Base):
     origin : Mapped["Cds"] = relationship(back_populates="cds", remote_side=[cds_id], post_update=True)
     # It says to add this as self-referential foreign key
     # https://docs.sqlalchemy.org/en/20/orm/self_referential.html
-'''
 
 class CdsXref(Base):
     __tablename__ = "cds_xref"
@@ -141,7 +140,7 @@ class CdsModif(Base):
     modification: Mapped["Modif"] = relationship(back_populates="cdss")
     cds: Mapped["Protein"] = relationship(back_populates="modifications")
 
-
+'''
 
 
 # proteincomplex = Table(
@@ -197,7 +196,7 @@ class Protein(Base):
             f"Protein is canonical: {self.is_canonical}",
         ]
         return "\n".join(outstr)
-'''
+
 class Name(Base):
     """Table representing a gene name
     Each gene_ID represents a protein name. Several name strings
@@ -212,7 +211,7 @@ class Name(Base):
         Integer, primary_key=True, autoincrement=True
     )  # primary key column
     prot_name = Column(String, nullable=False)
-'''
+
 class XrefIndex(Base):
     """Index table for all external databases"""
     
@@ -224,7 +223,7 @@ class XrefIndex(Base):
     xref_db = Column(String, nullable=False, unique=True) # Database name
     xref_href = Column(String, nullable=False, unique=True) # URL for database access
     xref_type = Column (String, nullable=False) # types of database: seq, struct, funct, tax'
-'''
+
 class Modif(Base):
     """Table representing the modification of the engineered CDS sequences
     """
@@ -238,6 +237,7 @@ class Modif(Base):
     modif_type = Column(String, nullable=False) # vocabulary restricted: truncated, fusion, synthetic, mutated, domesticated
     modif_description = Column(Integer, nullable=False) # Description of the specific modification
     UniqueConstraint (modif_type,modif_description)
+'''
 
 # class Complex(Base):
 #     """Table representing the complex that can be form by the interaction
@@ -258,6 +258,8 @@ class Modif(Base):
 #         "Protein", secondary=proteincomplex, back_populates="complexes", lazy="dynamic")
 # # To enforce unique no repeated complexes are created
 #     __table_args__ = (UniqueConstraint("complex_id", "complex_type", "complex_activity", "assembly_exp_tested", "complex_source"),)
+
+
 # class Prot_port_interact(Base):
 #     """Table representing the different specific interactions
 #     between several proteins inside a complex and during assembly
