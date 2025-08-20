@@ -49,7 +49,7 @@ class Protein(Base):
     prot_id = Column(Integer, primary_key=True, autoincrement=True)
     prot_accession = Column(
         Integer, nullable=False, unique=True
-    )  # Unique accession number for proteins
+    )  # Unique accession number for proteins ( I want to automate it, any suggestions on resources for this?)
     prot_seq = Column(String, nullable=False, unique=True)
     struct_prot_type = Column(
         Integer, nullable=True
@@ -85,7 +85,7 @@ class Xdatabase(Base):
     
     # Define table content:
     xref_db_id = Column(Integer, primary_key=True)
-    xref_db = Column(String, nullable=False, unique=True)  # Database name
+    xref_db_name = Column(String, nullable=False, unique=True)  # Database name
     xref_href = Column(String, nullable=False, unique=True)  # URL for database access
     xref_type = Column(
         String, nullable=False
@@ -152,13 +152,17 @@ class Cds(Base):
         ForeignKey("protein.prot_id"), nullable=False
         ) 
 
-    cds_origin : Mapped[int] = mapped_column(
+
+# What if I have many parents (recombiant sequences)? Should I add them as sepate table just in cse?
+    origin_id : Mapped[int] = mapped_column(
         ForeignKey("cds.cds_id"), nullable=True
     ) # Foreign key, origin DNA sequence (cds_id key)
     
-    # Introduce all relationship between tables:
+    # Introduce all relationship between tables: Check this?
     protein: Mapped["Protein"] = relationship(back_populates="cds")
-    origin : Mapped["Cds"] = relationship(back_populates="cds", remote_side=[cds_id], post_update=True)
+    origin : Mapped["Cds"] = relationship(remote_side=[cds_id], 
+    backref="derived_sequences", 
+    post_update=True)
     # It says to add this as self-referential foreign key
     # https://docs.sqlalchemy.org/en/20/orm/self_referential.html
     references: Mapped["CdsXref"] = relationship(back_populates="cds_xref")
@@ -352,6 +356,293 @@ class Prot_prot_interact(Base):
     protein_1: Mapped["Protein"] = relationship(back_populates="interaction_1")
     protein_2: Mapped["Protein"] = relationship(back_populates="interaction_2")
 
+# Function for protein data addition
+def protein_addition(session, protaccession, protseq, struct, canonical):
+    # Args:
+    # protseq (str): Protein sequence.
+    # protaccession (str): Protein unique accession number
+    # struct (str): Protein structure type.
+    # canonical (boolean): Canonical if true, false if isoform
+
+    # Explanation on how the code works:
+    # 1. If the protein already exists, store it in the `protein` variable
+    # 2. If the protein does not exist, create a new protein object and add it to
+    #    the session
+    # 3. Commit the session to the database
+
+    ## NOTE: SQLAlchemy will autoflush the session when we query the database, so we
+    ##       do not need to manually flush the session before committing
+    ##       (https://docs.sqlalchemy.org/en/20/orm/session_basics.html#session-flushing)
+    ##       This will also automatically commit the session if no exceptions are
+    ##       raised but, if errors are raised, we will need to rollback the session
+    ##       and continue to the next entry.
+
+    print(f"\nNow in {protein_addition.__name__}")
+
+    print(
+        f"Before query, {protseq[:10]=}..., {protaccession=}, {struct=}, {canonical=}"
+    )
+    # Create a new protein object
+    protein = (
+        session.query(Protein)
+        .filter(Protein.prot_seq == protseq)
+        .filter(Protein.prot_accession == protaccession) # Do I need this?
+        .first()
+    )
+    print(f"After query, {protein=}")
+
+    # Add protein if it is not already present
+    if not protein:
+        protein = Protein(
+            prot_seq=protseq,
+            prot_accession=protaccession,
+            struct_prot_type=struct,
+            is_canonical=canonical,
+        )
+        session.add(protein)
+        session.flush()  # This sends the changes to the database, so prot_id is assigned
+    else:
+        print(f"Protein with accession number {protaccession} already exists")
+
+    print(f"Protein row returned: {protein}")
+
+    # except Exception as exc:
+    #     print(f"Error committing protein/gene combination: {exc}")
+    #     print("Rolling back changes and skipping to next entry\n")
+    #     session.rollback()
+    # Rollback makes it that when there is a "fail",
+    # like not unique uniprot reference, its "forgets" the error and keeps going.
+    return (
+        protein  # Return the protein row we just added to the db
+    )
+
+# Function for Xdatabase data addition
+def xdatabase_addition(session, xname, href, xtype):
+    # Args:
+    # xdb_name (str): Database name.
+    # href (str): Database URL.
+    # xdb_type (str): Database type (sequence, structure, function, taxonomy)
+
+    # Explanation on how the code works:
+    # 1. Check if the database already exists,  store it in the `xdb` variable
+    # 2. If the database does not exist, create a new db object and add it to the
+    #    session
+    # 3. Commit the session to the database
+
+    print(f"\nNow in {xdatabase_addition.__name__}")
+    print(f"Before query, {xname=}, {href=}, {xtype=}")
+
+    # Create a new db object
+    xdb = (
+        session.query(Xdatabase)
+        .filter(Xdatabase.xref_db_name == xname)
+        .filter(Xdatabase.xref_href == href)
+        .first()
+    )
+    print(f"After query, {xdb=}")
+
+    # Add db if it is not already present
+    if not xdb:
+        xdb = Xdatabase(xref_db_name=xname, xref_href=href, xref_type=xtype)
+        session.add(xdb)
+        session.flush()
+        print(f"Database {xname} added")
+    else:
+        print(f"This database {xname} has already being added")
+    print(f"Database row returned: {xdb}")
+
+    return xdb  # Return the db row we just added to the db/otherwise dealt with
+
+# Function for CDS data addition
+def cds_addition(session, cdsseq, cdsaccession, cdsorigin, protein):
+    # Args:
+    # cdsseq (str): Gene DNA sequence.
+    # cdsaccession: (str) Unique accession number CDS
+    # cds_origin (str): Original CDS sequence if the sequence is modified.
+    # protein: Protein information added with protein_addition function
+
+    # Explanation on how the code works:
+    # 1. Check if the cds already exists,  store it in the `cds` variable
+    # 2. If the cds does not exist, create a new cds object and add it to the
+    #    session
+    # 3. Check if the cds is already associated with the protein, and if not
+    #    create a new `proteingene` object and add it to the session
+    # 4. Commit the session to the database
+
+    print(f"\nNow in {cds_addition.__name__}")
+
+    print(f"Before query, {cdsseq[:10]=}...,{cdsaccession=} {cdsorigin=}")
+
+    # Create a new cds object
+    cds = (
+        session.query(Cds)
+        .filter(Cds.cds_seq == cdsseq)
+        .first()
+    )
+    print(f"After query, {cds=}")
+
+    # Add cds if it is not already present
+    if not cds:
+        print(f"Before adding seq and accession {cds=}")
+        cds = Cds(
+            cds_seq=cdsseq,
+            cds_accession=cdsaccession,
+            protein=protein, # Use relationship not FK directly
+            origin=cdsorigin) # Use relationship not FK directly
+        print(f" After adding seq and accession{cds=}")
+        print(f"{protein.prot_id=}, {cds.cds_id=}, {cds.prot_id}")
+        print(f"{protein.cdss=}")
+        session.add(cds)
+        session.flush()
+        print(f"Cds {cdsseq[:10]=} with accession {cdsaccession=} added")
+    else:
+        print(f"This CDS {cdsseq[:10]=} with accession {cdsaccession=} has already being added")
+    
+    print(f"Cds row returned: {cds}")
+
+    return cds  # Return the cds row we just added to the db/otherwise dealt with
+
+# Function for xref data addition and linking to cds and protein
+def xref_addition(session, xdb, cds, protein, xrefacc):
+    # Args:
+        # xdb: Xdatabase ORM object (external DB already added)
+        # cds: Cds ORM object
+        # protein: Protein ORM object
+        # xrefacc (str): accession string for this external reference
+    
+    # Explanation on how the code works:
+    # 1. Check if the xref already exists,  store it in the `xref` variable
+    # 2. If the xref does not exist, create a new xref object and add it to the
+    #    session
+    
+    ''' Neeed to think on how to do that, condition depending on type of database?'''
+    # 3. Check if the xref is already associated with the cds_xref, and if not
+    #    create a new `cds_xref` object and add it to the session
+    # 4. Check if the xref is already associated with the prot_xref, and if not
+    #    create a new `prot_xref` object and add it to the session
+    
+    # 4. Commit the session to the database
+
+    print(f"\nNow in {xref_addition.__name__} with {xrefacc=}")
+
+    print(f"Before query, {xdb=}, {xrefacc=}")
+
+    # Create a new xref object
+    xref = (
+        session.query(Xref)
+        .filter(Xref.xref_acc == xrefacc)
+        .first()
+    )
+    print(f"After query, {xref=}")
+
+    # Add xref if it is not already present
+    if not xref:
+        xref = Xref(xref_acc=xrefacc, XDatabase=xdb)
+        session.add(xref)
+        session.flush()
+        print(f"External reference {xrefacc=} from database {xdb=} added")
+    else:
+        print(f"This external reference {xrefacc=} from database {xdb=} has already being added")
+    print(f"External reference row returned: External reference {xrefacc=}")
+
+    # Associate the reference and protein information in the prot_xref
+    print(f"{xref.proteins=}, {type(xref.proteins)}")
+
+    # 2. Link to Protein (ProteinXref)
+    link_prot = (
+        session.query(ProteinXref)
+        # Unsure about this?
+        .filter_by(protein==protein and xref==xref)
+        .first()
+    )
+
+    if not link_prot:
+        link_prot = ProteinXref(protein=protein, xref=xref)
+        session.add(link_prot)
+        print(f"Linked Protein {protein} <-> Xref {xref}")
+    else:
+        print(f"Protein {protein} already linked to Xref {xref}")
+
+    # 3. Link to CDS (CdsXref)
+    link_cds = (
+        session.query(CdsXref)
+        # Unsure about this?
+        .filter_by(cds==cds and xref==xref)
+        .first()
+    )
+
+    if not link_cds:
+        link_cds = Cds_xref(cds=cds, xref=xref)
+        session.add(link_cds)
+        print(f"Linked CDS {cds} <-> Xref {xref}")
+    else:
+        print(f"CDS {cds} already linked to Xref {xref}")
+
+
+
+    return xref  # Return the renference row we just added to the db/otherwise dealt with
+
+# Function for name data addition
+def name_addition(session, protname, protein):
+    # Args:
+    # protname (str): Protein name.
+    # protein: Protein information added with protein_addition function
+
+    # Explanation on how the code works:
+    # 1. Check if the name already exists,  store it in the `name` variable
+    # 2. If the name does not exist, create a new name object and add it to the
+    #    session
+    # 3. Check if the name is already associated with the protein, and if not
+    #    create a new `proteinname` object and add it to the session
+    # 4. Commit the session to the database
+
+    print(f"\nNow in {name_addition.__name__}")
+
+    with session.no_autoflush:
+        print(f"Before query, {protname=}")
+
+        # Create a new name object
+        name = (
+            session.query(Name)
+            .filter(Name.prot_name == protname)
+            .first()
+        )
+        print(f"After query, {name=}")
+
+        # Add name if it is not already present
+        if not name:
+            name = Name(prot_name=protname)
+            session.add(name)
+            session.flush()
+            print(f"Name {protname=} added")
+        else:
+            print(f"This name {protname} has already being added")
+        print(f"Name row returned: {name}")
+
+        print(f"{name.proteins=}, {type(name.proteins)}")
+
+        if name not in name.proteins:
+            proteinname = ProteinName()
+            proteinname.name = name
+            protein.names.append(proteinname)
+            print(f"{name.proteins=}")
+            print(f"\nLinked name {name.name_id} to Protein {protein.prot_id}")
+            print(f"{proteinname=}")
+        else:
+            print(
+                f"Name {name.name_id} is already linked to Protein {protein.prot_id}"
+            )
+        print(f"{name}")
+        print(f"Linked name from protein: {proteingene.gene}")
+
+        return name  # Return the gene row we just added to the db/otherwise dealt with
+
+
+
+
+
+
+
 
 # Function to create the database and tables
 def create_db(dbpath: Path):
@@ -370,7 +661,6 @@ def get_session(dbpath: Path):
     engine = create_engine(db_URL)
     Session.configure(bind=engine)
     return Session()
-
 
 if __name__ == "__main__":
     create_db(Path("db.sqlite3"))
