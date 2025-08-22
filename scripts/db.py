@@ -151,22 +151,34 @@ class Cds(Base):
     prot_id : Mapped[int] = mapped_column(
         ForeignKey("protein.prot_id"), nullable=False
         ) 
-
-
-# What if I have many parents (recombiant sequences)? Should I add them as sepate table just in cse?
-    origin_id : Mapped[int] = mapped_column(
-        ForeignKey("cds.cds_id"), nullable=True
-    ) # Foreign key, origin DNA sequence (cds_id key)
     
     # Introduce all relationship between tables: Check this?
     protein: Mapped["Protein"] = relationship(back_populates="cds")
-    origin : Mapped["Cds"] = relationship(remote_side=[cds_id], 
-    backref="derived_sequences", 
-    post_update=True)
-    # It says to add this as self-referential foreign key
-    # https://docs.sqlalchemy.org/en/20/orm/self_referential.html
+    origins : Mapped["Origin"] = relationship(back_populates="origin")
+    cdss : Mapped["Origin"] = relationship(back_populates="cds")
     references: Mapped["CdsXref"] = relationship(back_populates="cds_xref")
     modifications: Mapped["CdsModif"] = relationship(back_populates="cds")
+
+class Origin(Base):
+    """Table representing the original DNA sequence of a modified CDS
+    This table will store the original DNA sequence and the corresponding
+    modified CDS sequence id
+    """
+
+    __tablename__ = "origin"
+    __table_args__ = (PrimaryKeyConstraint("origin_id", "cds_id"),)
+
+    # Define table content:
+    origin_id: Mapped[int] = mapped_column(
+        ForeignKey("cds.cds_id"),nullable=False
+    )  # Original CDS sequence (cds_id key)
+    cds_id: Mapped[int] = mapped_column(
+        ForeignKey("cds.cds_id"), nullable=False
+    )  # Foreign key, modified CDS sequence (cds_id key)
+
+    # Introduce all relationship between tables:
+    cds: Mapped["Cds"] = relationship(back_populates="cds")
+    origin: Mapped["Cds"] = relationship(back_populates="origins")
 
 class CdsXref(Base):
     """Linker table, CDS to database cross-reference"""
@@ -331,6 +343,23 @@ class ProteinComplex(Base):
     complex: Mapped["Complex"] = relationship(back_populates="proteins")
     protein: Mapped["Protein"] = relationship(back_populates="complexes")    
 
+class Interaction(Base):
+    """Table representing the different interactions
+    between several proteins.
+    """
+
+    __tablename__ = "interaction"
+    
+    # Define table content:
+    interact_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
+    interact_type = Column(String, nullable=False)  # Type of interaction (e.g: electrostatic, hydrophobic, etc)
+    interact_description = Column(String)  # Description of the interaction
+    
+    UniqueConstraint (interact_type, interact_description)
+
+    # Introduce all relationship between tables:
+    interactions: Mapped["Prot_prot_interact"] = relationship(back_populates="interaction")
+
 class Prot_prot_interact(Base):
     """Table representing the different specific interactions
     between several proteins inside a complex and during assembly
@@ -339,9 +368,12 @@ class Prot_prot_interact(Base):
     """
 
     __tablename__ = "prot_prot_interact"
-    
+    __table_args__ = (PrimaryKeyConstraint("interact_id", "prot_id_1", "prot_id_2"),)
+
     # Define table content:
-    ppi_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
+    interact_id: Mapped[int] = mapped_column(
+        ForeignKey("interaction.interact_id"),
+    )
     prot_id_1: Mapped[int] = mapped_column(
         ForeignKey("protein.prot_id"),
     )
@@ -350,12 +382,17 @@ class Prot_prot_interact(Base):
     )
 
     # To enforce unique no repeated protein to protein interactions are created
-    UniqueConstraint("prot_id_1", "prot_id_2")
+    UniqueConstraint("prot_id_1", "prot_id_2", "interaction_id")
     
     # Introduce all relationship between tables:
     protein_1: Mapped["Protein"] = relationship(back_populates="interaction_1")
     protein_2: Mapped["Protein"] = relationship(back_populates="interaction_2")
+    interaction: Mapped["Interaction"] = relationship(back_populates="interactions")
 
+
+
+''' Functions to add data to the database'''
+'''
 # Function for protein data addition
 def protein_addition(session, protaccession, protseq, struct, canonical):
     # Args:
@@ -515,7 +552,7 @@ def xref_addition(session, xdb, cds, protein, xrefacc):
     # 2. If the xref does not exist, create a new xref object and add it to the
     #    session
     
-    ''' Neeed to think on how to do that, condition depending on type of database?'''
+    # Need to think on how to do that, condition depending on type of database?
     # 3. Check if the xref is already associated with the cds_xref, and if not
     #    create a new `cds_xref` object and add it to the session
     # 4. Check if the xref is already associated with the prot_xref, and if not
@@ -637,7 +674,7 @@ def name_addition(session, protname, protein):
 
         return name  # Return the gene row we just added to the db/otherwise dealt with
 
-
+'''
 
 
 
