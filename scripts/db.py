@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
-# This script is the development of the BMC db. Instructions
-# followed and explanations needed kept to help following through
+'''This script is the development of the BMC db. Instructions
+followed and explanations needed kept to help following through
+the process.'''
 from pathlib import Path  # for type hints
 
 # Import  SQLAlchemy classes needed with a declarative approach.

@@ -1,25 +1,29 @@
 #!/usr/bin/env python
 
-# This script links the addition of data manually to the BMC using csv from readfile to database described in db.
-# Following the data addition structure from data_addition. Instructions
-# followed and explanations kept to help following through
+''' This script links the addition of data manually to the BMC using csv from readfile to database described in db.
+Following the data addition structure from data_addition. Instructions
+followed and explanations kept to help following through
 
-# To be able to make exceptions in code (try/except):
-# from sqlalchemy.exc import IntegrityError, PendingRollbackError
-# For exiting system for trouble shooting import sys
+To be able to make exceptions in code (try/except):
+from sqlalchemy.exc import IntegrityError, PendingRollbackError
+For exiting system for trouble shooting import sys
+'''
+
 from db import protein_addition, name_addition, cds_addition, xref_addition, xdatabase_addition
 
 
 # Making a function for the addition of data to the different tables created with db.py following data_instructions:
 def link_db_csv(mydata, session):
-    # Function for each data type addition created
-    # Add the data to the database in a loop, but we'll have to
-    # check if the data entered already exist
-    # and update the corresponding tables accordingly.
-    # We need to check if the sequence, structure, and accession already exist,
-    # and update the corresponding tables accordingly if they do not.
-    # We can then update the linker tables by adding the corresponding items.
-
+    
+    '''Function for each data type addition created
+    Add the data to the database in a loop, but we'll have to
+    check if the data entered already exist
+    and update the corresponding tables accordingly.
+    We need to check if the sequence, structure, and accession already exist,
+    and update the corresponding tables accordingly if they do not.
+    We can then update the linker tables by adding the corresponding items.
+    '''
+    
     # Can I make this bit more efficient with a loop?
     for idx, row in enumerate(mydata):
         (

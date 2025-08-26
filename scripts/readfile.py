@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
-# This script allows for the reading of excel file for manual data addition to the database. Instructions
-# followed and explanations kept to help following through
+'''This script allows for the reading of excel file for manual data addition to the database. Instructions
+followed and explanations kept to help following through
+'''
 
 # Open .csv to be able to work with .csv files
 import csv
