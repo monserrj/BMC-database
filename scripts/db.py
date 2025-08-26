@@ -392,27 +392,30 @@ class Prot_prot_interact(Base):
 
 
 ''' Functions to add data to the database'''
-'''
+
 # Function for protein data addition
 def protein_addition(session, protaccession, protseq, struct, canonical):
-    # Args:
-    # protseq (str): Protein sequence.
-    # protaccession (str): Protein unique accession number
-    # struct (str): Protein structure type.
-    # canonical (boolean): Canonical if true, false if isoform
+    
+    '''
+    Args:
+    protseq (str): Protein sequence.
+    protaccession (str): Protein unique accession number
+    struct (str): Protein structure type.
+    canonical (boolean): Canonical if true, false if isoform
 
-    # Explanation on how the code works:
-    # 1. If the protein already exists, store it in the `protein` variable
-    # 2. If the protein does not exist, create a new protein object and add it to
-    #    the session
-    # 3. Commit the session to the database
+    Explanation on how the code works:
+    1. If the protein already exists, store it in the `protein` variable
+    2. If the protein does not exist, create a new protein object and add it to
+       the session
+    3. Commit the session to the database
 
-    ## NOTE: SQLAlchemy will autoflush the session when we query the database, so we
-    ##       do not need to manually flush the session before committing
-    ##       (https://docs.sqlalchemy.org/en/20/orm/session_basics.html#session-flushing)
-    ##       This will also automatically commit the session if no exceptions are
-    ##       raised but, if errors are raised, we will need to rollback the session
-    ##       and continue to the next entry.
+    NOTE: SQLAlchemy will autoflush the session when we query the database, so we
+          do not need to manually flush the session before committing
+          (https://docs.sqlalchemy.org/en/20/orm/session_basics.html#session-flushing)
+           This will also automatically commit the session if no exceptions are
+          raised but, if errors are raised, we will need to rollback the session
+          and continue to the next entry.
+    '''
 
     print(f"\nNow in {protein_addition.__name__}")
 
@@ -455,16 +458,18 @@ def protein_addition(session, protaccession, protseq, struct, canonical):
 
 # Function for Xdatabase data addition
 def xdatabase_addition(session, xname, href, xtype):
-    # Args:
-    # xdb_name (str): Database name.
-    # href (str): Database URL.
-    # xdb_type (str): Database type (sequence, structure, function, taxonomy)
+    
+    ''' Args:
+    xdb_name (str): Database name.
+    href (str): Database URL.
+    xdb_type (str): Database type (sequence, structure, function, taxonomy)
 
-    # Explanation on how the code works:
-    # 1. Check if the database already exists,  store it in the `xdb` variable
-    # 2. If the database does not exist, create a new db object and add it to the
-    #    session
-    # 3. Commit the session to the database
+    Explanation on how the code works:
+    1. Check if the database already exists,  store it in the `xdb` variable
+    2. If the database does not exist, create a new db object and add it to the
+       session
+    3. Commit the session to the database
+    '''
 
     print(f"\nNow in {xdatabase_addition.__name__}")
     print(f"Before query, {xname=}, {href=}, {xtype=}")
@@ -492,19 +497,21 @@ def xdatabase_addition(session, xname, href, xtype):
 
 # Function for CDS data addition
 def cds_addition(session, cdsseq, cdsaccession, cdsorigin, protein):
-    # Args:
-    # cdsseq (str): Gene DNA sequence.
-    # cdsaccession: (str) Unique accession number CDS
-    # cds_origin (str): Original CDS sequence if the sequence is modified.
-    # protein: Protein information added with protein_addition function
 
-    # Explanation on how the code works:
-    # 1. Check if the cds already exists,  store it in the `cds` variable
-    # 2. If the cds does not exist, create a new cds object and add it to the
-    #    session
-    # 3. Check if the cds is already associated with the protein, and if not
-    #    create a new `proteingene` object and add it to the session
-    # 4. Commit the session to the database
+    ''' Args:
+    cdsseq (str): Gene DNA sequence.
+    cdsaccession: (str) Unique accession number CDS
+    cds_origin (str): Original CDS sequence if the sequence is modified.
+    protein: Protein information added with protein_addition function
+
+    Explanation on how the code works:
+    1. Check if the cds already exists,  store it in the `cds` variable
+    2. If the cds does not exist, create a new cds object and add it to the
+       session
+    3. Check if the cds is already associated with the protein, and if not
+       create a new `proteingene` object and add it to the session
+    4. Commit the session to the database
+    '''
 
     print(f"\nNow in {cds_addition.__name__}")
 
@@ -541,24 +548,26 @@ def cds_addition(session, cdsseq, cdsaccession, cdsorigin, protein):
 
 # Function for xref data addition and linking to cds and protein
 def xref_addition(session, xdb, cds, protein, xrefacc):
-    # Args:
-        # xdb: Xdatabase ORM object (external DB already added)
-        # cds: Cds ORM object
-        # protein: Protein ORM object
-        # xrefacc (str): accession string for this external reference
+
+    ''' Args:
+        xdb: Xdatabase ORM object (external DB already added)
+        cds: Cds ORM object
+        protein: Protein ORM object
+        xrefacc (str): accession string for this external reference
     
-    # Explanation on how the code works:
-    # 1. Check if the xref already exists,  store it in the `xref` variable
-    # 2. If the xref does not exist, create a new xref object and add it to the
-    #    session
+    Explanation on how the code works:
+    1. Check if the xref already exists,  store it in the `xref` variable
+    2. If the xref does not exist, create a new xref object and add it to the
+       session
     
-    # Need to think on how to do that, condition depending on type of database?
-    # 3. Check if the xref is already associated with the cds_xref, and if not
-    #    create a new `cds_xref` object and add it to the session
-    # 4. Check if the xref is already associated with the prot_xref, and if not
-    #    create a new `prot_xref` object and add it to the session
+    Need to think on how to do that, condition depending on type of database?
+    3. Check if the xref is already associated with the cds_xref, and if not
+       create a new `cds_xref` object and add it to the session
+    4. Check if the xref is already associated with the prot_xref, and if not
+       create a new `prot_xref` object and add it to the session
     
-    # 4. Commit the session to the database
+    4. Commit the session to the database
+    '''
 
     print(f"\nNow in {xref_addition.__name__} with {xrefacc=}")
 
@@ -621,17 +630,19 @@ def xref_addition(session, xdb, cds, protein, xrefacc):
 
 # Function for name data addition
 def name_addition(session, protname, protein):
-    # Args:
-    # protname (str): Protein name.
-    # protein: Protein information added with protein_addition function
 
-    # Explanation on how the code works:
-    # 1. Check if the name already exists,  store it in the `name` variable
-    # 2. If the name does not exist, create a new name object and add it to the
-    #    session
-    # 3. Check if the name is already associated with the protein, and if not
-    #    create a new `proteinname` object and add it to the session
-    # 4. Commit the session to the database
+    ''' Args:
+    protname (str): Protein name.
+    protein: Protein information added with protein_addition function
+
+    Explanation on how the code works:
+    1. Check if the name already exists,  store it in the `name` variable
+    2. If the name does not exist, create a new name object and add it to the
+       session
+    3. Check if the name is already associated with the protein, and if not
+       create a new `proteinname` object and add it to the session
+    4. Commit the session to the database
+    '''
 
     print(f"\nNow in {name_addition.__name__}")
 
@@ -674,7 +685,6 @@ def name_addition(session, protname, protein):
 
         return name  # Return the gene row we just added to the db/otherwise dealt with
 
-'''
 
 
 
