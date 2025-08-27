@@ -1,2 +1,3 @@
 sqlalchemy
 click
+enum # library
