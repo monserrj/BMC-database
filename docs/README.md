@@ -4,6 +4,20 @@ This folder is intended to hold _documentation_ for my database repository and p
 
 - A training folder from the sqlite carpentry course with Python examples
 - A normalisation folder with excel where manula normalisation to start developing the database and to keep optimising it are kept
+- A folder with documentation files in Jupyter notebooks (this folder)
+  - This folder will contain information about the project, including:
+    - Acknowledgements
+    - Contact information
+    - Contributions
+    - The controlled vocabulary of the database
+    - Description of the database structure (db.py)
+    - Examples of usage of the database
+    - Installation instructions
+    - Introduction to the project and the different files in the repository
+    - Licensing information
+    - Description of how the addition of data (manually) is done
+    - Description of the main code scripts that compile all the different scripts and run the database
+    
 - A detailed account (or accounts) of your project's analysis workflow (to be developed)
   - essentially, this would be an online Methods section for your work
 
