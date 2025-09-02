@@ -89,7 +89,7 @@ class Xdatabase(Base):
     
     # Define table content:
     xref_db_id = Column(Integer, primary_key=True)
-    xref_db_name = Column(String, nullable=False, unique=True)  # Database name
+    xref_db_name = Column(String, nullable=False, unique=True)  
     xref_href = Column(String, nullable=False, unique=True)  # URL for database access
     xref_type = Column(
         String, nullable=False
@@ -106,11 +106,11 @@ class Xref(Base):  # All external references
 
     # Define table content:
     xref_id = Column(Integer, primary_key=True, autoincrement=True)
-    xref_acc = Column(String, unique=True, nullable=False)  # Accession from external db
+    xref_acc_ext = Column(String, unique=True, nullable=False)  # Accession from external db
     xref_db_id: Mapped[int] = mapped_column(
         ForeignKey("xdatabase.xref_db_id"),
         nullable=False,
-    )  # External reference db key
+    ) 
 
     # Introduce all relationships between tables
     xref_db: Mapped["Xdatabase"] = relationship(back_populates="databases")
@@ -161,7 +161,7 @@ class Cds(Base):
     origins : Mapped["Origin"] = relationship(back_populates="origin")
     cdss : Mapped["Origin"] = relationship(back_populates="cds")
     references: Mapped["CdsXref"] = relationship(back_populates="cds_xref")
-    modifications: Mapped["CdsModif"] = relationship(back_populates="cds")
+    modifications: Mapped["CdsModification"] = relationship(back_populates="cds")
 
 class Origin(Base):
     """Table representing the original DNA sequence of a modified CDS
@@ -173,6 +173,7 @@ class Origin(Base):
     __table_args__ = (PrimaryKeyConstraint("origin_id", "cds_id"),)
 
     # Define table content:
+# Should I change names here?
     origin_id: Mapped[int] = mapped_column(
         ForeignKey("cds.cds_id"),nullable=False
     )  # Original CDS sequence (cds_id key)
@@ -202,39 +203,39 @@ class CdsXref(Base):
     cds: Mapped["Cds"] = relationship(back_populates="references")
     x_ref: Mapped["Xref"] = relationship(back_populates="cdss")
     
-class Modif(Base):
+class Modification(Base):
     """Table representing the modification of the engineered CDS sequences
     This modifications will be vocabulary restricted: 
     truncated, fusion, synthetic, mutated, domesticated """
     
-    __tablename__ = "modif"
+    __tablename__ = "modification"
        
     # Define table content:
-    modif_id = Column(Integer, primary_key=True, autoincrement=True)
-    modif_type = Column(String, nullable=False) # vocabulary restricted
-    modif_description = Column(String, nullable=False) # Description of the specific modification
+    modification_id = Column(Integer, primary_key=True, autoincrement=True)
+    modification_type = Column(String, nullable=False) # vocabulary restricted
+    modification_description = Column(String, nullable=False)
     
-    UniqueConstraint (modif_type, modif_description)
+    UniqueConstraint (modification_type, modification_description)
 
     # Introduce all relationship between tables:
-    modifications: Mapped["CdsModif"] = relationship(back_populates="modification")
+    modifications: Mapped["CdsModification"] = relationship(back_populates="modification")
 
-class CdsModif(Base):
+class CdsModification(Base):
     """Linker table, CDS to modification cross-reference"""
 
-    __tablename__ = "cds_modif"
-    __table_args__ = (PrimaryKeyConstraint("cds_id", "modif_id"),)
+    __tablename__ = "cds_modification"
+    __table_args__ = (PrimaryKeyConstraint("cds_id", "modification_id"),)
 
     # Define table content:
     cds_id: Mapped[int] = mapped_column(
         ForeignKey("cds.cds_id")
     )
-    modif_id: Mapped[int] = mapped_column(
-        ForeignKey("modif.modif_id")
+    modification_id: Mapped[int] = mapped_column(
+        ForeignKey("modification.modification_id")
     )
     
     # Introduce all relationship between tables:
-    modification: Mapped["Modif"] = relationship(back_populates="modifications")
+    modification: Mapped["Modification"] = relationship(back_populates="modifications")
     cds: Mapped["Cds"] = relationship(back_populates="modifications")
 
 class Name(Base):
@@ -308,7 +309,7 @@ class Complex(Base):
 
     # Define table content:
     complex_id = Column(Integer, primary_key=True, autoincrement=True)  
-    complex_name = Column(String, nullable=False)  # Name of the complex
+    complex_name = Column(String, nullable=False)  
     complex_type = Column(String, nullable=False) # Classification undecided (pdu,eut,grm..)
     is_active = Column(String) # Active/Inactive. Boolean?
     is_exp_tested = Column(String) #Y/N. Boolean?
@@ -355,9 +356,9 @@ class Interaction(Base):
     __tablename__ = "interaction"
     
     # Define table content:
-    interact_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
+    interact_id = Column(Integer, primary_key=True, autoincrement=True) 
     interact_type = Column(String, nullable=False)  # Type of interaction (e.g: electrostatic, hydrophobic, etc)
-    interact_description = Column(String)  # Description of the interaction
+    interact_description = Column(String)  
     
     UniqueConstraint (interact_type, interact_description)
 
@@ -580,14 +581,14 @@ class Prot_prot_interact(Base):
 #     # Create a new xref object
 #     xref = (
 #         session.query(Xref)
-#         .filter(Xref.xref_acc == xrefacc)
+#         .filter(Xref.xref_acc_ext == xrefacc)
 #         .first()
 #     )
 #     print(f"After query, {xref=}")
 
 #     # Add xref if it is not already present
 #     if not xref:
-#         xref = Xref(xref_acc=xrefacc, XDatabase=xdb)
+#         xref = Xref(xref_acc_ext=xrefacc, XDatabase=xdb)
 #         session.add(xref)
 #         session.flush()
 #         print(f"External reference {xrefacc=} from database {xdb=} added")
