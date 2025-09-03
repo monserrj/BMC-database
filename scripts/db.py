@@ -4,6 +4,9 @@
 followed and explanations needed kept to help following through
 the process."""
 
+import logging  # We'll use this to report program state and other things to the user
+import sys
+
 from pathlib import Path  # for type hints
 
 # Import  SQLAlchemy classes needed with a declarative approach.
@@ -738,7 +741,22 @@ def get_session(dbpath: Path):
 
 
 if __name__ == "__main__":
-    create_db(Path("db.sqlite3"))
+    # Set up logging
+    logger = logging.getLogger()
+    logformatter = logging.Formatter("%(asctime)s %(message)s")
+    logger.setLevel(logging.DEBUG)
+
+    # Add a handler that writes to the console
+    termhandler = logging.StreamHandler(sys.stdout)
+    termhandler.setFormatter(logformatter)
+    logger.addHandler(termhandler)
+
+    # Path to output database
+    outdbpath = Path("db.sqlite3")
+
+    # Create database
+    logger.info("Creating and populating database at %s", outdbpath)
+    create_db(outdbpath)
 
 
 ## How to populate parent child relationships for CDS
