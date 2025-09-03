@@ -725,16 +725,19 @@ def create_db(dbpath: Path):
     """Function to create all the tables from the database"""
     # Create a database engine to connect to the database.
     # This creates a new empty database file called bmc.db in the current directory.
+    logger = logging.getLogger(__name__)
+
     db_URL = f"sqlite:///{dbpath}"
+
+    logger.debug("Binding to session at %s", db_URL)
     engine = create_engine(db_URL)
     Base.metadata.create_all(bind=engine)
-    print("Database and tables created successfully")
+    logger.info("Database and tables created successfully")
 
 
 # Function to get a live session to the database
 def get_session(dbpath: Path):
     """Returns live session to database."""
-    db_URL = f"sqlite:///{dbpath}"
     engine = create_engine(db_URL)
     Session.configure(bind=engine)
     return Session()
@@ -743,7 +746,7 @@ def get_session(dbpath: Path):
 if __name__ == "__main__":
     # Set up logging
     logger = logging.getLogger()
-    logformatter = logging.Formatter("%(asctime)s %(message)s")
+    logformatter = logging.Formatter("[%(levelname)s] %(asctime)s %(message)s")
     logger.setLevel(logging.DEBUG)
 
     # Add a handler that writes to the console
