@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
-'''This script is the development of the BMC db. Instructions
+"""This script is the development of the BMC db. Instructions
 followed and explanations needed kept to help following through
-the process.'''
+the process."""
+
 from pathlib import Path  # for type hints
 
 # Import  SQLAlchemy classes needed with a declarative approach.
@@ -78,18 +79,22 @@ class Protein(Base):
     isoforms: Mapped["Isoforms"] = relationship(back_populates="isoform")
     canonicals: Mapped["Isoforms"] = relationship(back_populates="canonical")
     complexes: Mapped["ProteinComplex"] = relationship(back_populates="protein")
-    interaction_1: Mapped["Prot_prot_interact"] = relationship(back_populates="protein_1")
-    interaction_2: Mapped["Prot_prot_interact"] = relationship(back_populates="protein_2")
+    interaction_1: Mapped["Prot_prot_interact"] = relationship(
+        back_populates="protein_1"
+    )
+    interaction_2: Mapped["Prot_prot_interact"] = relationship(
+        back_populates="protein_2"
+    )
 
 
 class Xdatabase(Base):
     """Descriptions of external databases (linked by Xref accessions)"""
 
     __tablename__ = "xdatabase"
-    
+
     # Define table content:
     xref_db_id = Column(Integer, primary_key=True)
-    xref_db_name = Column(String, nullable=False, unique=True)  
+    xref_db_name = Column(String, nullable=False, unique=True)
     xref_href = Column(String, nullable=False, unique=True)  # URL for database access
     xref_type = Column(
         String, nullable=False
@@ -99,6 +104,7 @@ class Xdatabase(Base):
     xref: Mapped["Xref"] = relationship(back_populates="xref_db_id")
     databases: Mapped[list["Xref"]] = relationship()
 
+
 class Xref(Base):  # All external references
     """Table representing a singe database cross-reference"""
 
@@ -106,16 +112,19 @@ class Xref(Base):  # All external references
 
     # Define table content:
     xref_id = Column(Integer, primary_key=True, autoincrement=True)
-    xref_acc_ext = Column(String, unique=True, nullable=False)  # Accession from external db
+    xref_acc_ext = Column(
+        String, unique=True, nullable=False
+    )  # Accession from external db
     xref_db_id: Mapped[int] = mapped_column(
         ForeignKey("xdatabase.xref_db_id"),
         nullable=False,
-    ) 
+    )
 
     # Introduce all relationships between tables
     xref_db: Mapped["Xdatabase"] = relationship(back_populates="databases")
     proteins: Mapped["ProteinXref"] = relationship(back_populates="xref")
     cdss: Mapped["CdsXref"] = relationship(back_populates="cds")
+
 
 class ProteinXref(Base):
     """Linker table, protein to database cross-reference"""
@@ -136,32 +145,32 @@ class ProteinXref(Base):
     protein: Mapped["Protein"] = relationship(back_populates="references")
     xref: Mapped["Xref"] = relationship(back_populates="proteins")
 
+
 class Cds(Base):
     """Table representing the gene details linked to a protein
-    This table will store the gene ID, DNA sequence, 
+    This table will store the gene ID, DNA sequence,
     origin sequences if engineered, accession number and the corresponding
     protein
     """
 
     __tablename__ = "cds"
 
-    #Define table content:
+    # Define table content:
     cds_id = Column(Integer, primary_key=True)
     cds_seq = Column(String, nullable=False, unique=True)
     cds_accession = Column(
         String, nullable=False, unique=True
     )  # Unique accession number for CDS
-    
-    prot_id : Mapped[int] = mapped_column(
-        ForeignKey("protein.prot_id"), nullable=False
-        ) 
-    
+
+    prot_id: Mapped[int] = mapped_column(ForeignKey("protein.prot_id"), nullable=False)
+
     # Introduce all relationship between tables: Check this?
     protein: Mapped["Protein"] = relationship(back_populates="cds")
-    origins : Mapped["Origin"] = relationship(back_populates="origin")
-    cdss : Mapped["Origin"] = relationship(back_populates="cds")
+    origins: Mapped["Origin"] = relationship(back_populates="origin")
+    cdss: Mapped["Origin"] = relationship(back_populates="cds")
     references: Mapped["CdsXref"] = relationship(back_populates="cds_xref")
     modifications: Mapped["CdsModification"] = relationship(back_populates="cds")
+
 
 class Origin(Base):
     """Table representing the original DNA sequence of a modified CDS
@@ -173,9 +182,9 @@ class Origin(Base):
     __table_args__ = (PrimaryKeyConstraint("origin_id", "cds_id"),)
 
     # Define table content:
-# Should I change names here?
+    # Should I change names here?
     origin_id: Mapped[int] = mapped_column(
-        ForeignKey("cds.cds_id"),nullable=False
+        ForeignKey("cds.cds_id"), nullable=False
     )  # Original CDS sequence (cds_id key)
     cds_id: Mapped[int] = mapped_column(
         ForeignKey("cds.cds_id"), nullable=False
@@ -185,6 +194,7 @@ class Origin(Base):
     cds: Mapped["Cds"] = relationship(back_populates="cds")
     origin: Mapped["Cds"] = relationship(back_populates="origins")
 
+
 class CdsXref(Base):
     """Linker table, CDS to database cross-reference"""
 
@@ -193,7 +203,7 @@ class CdsXref(Base):
 
     # Define table content:
     cds_id: Mapped[int] = mapped_column(
-        ForeignKey("cds.cds_id"), 
+        ForeignKey("cds.cds_id"),
     )
     xref_id: Mapped[int] = mapped_column(
         ForeignKey("xref.xref_id"),
@@ -202,23 +212,27 @@ class CdsXref(Base):
     # Introduce all relationship between tables:
     cds: Mapped["Cds"] = relationship(back_populates="references")
     x_ref: Mapped["Xref"] = relationship(back_populates="cdss")
-    
+
+
 class Modification(Base):
     """Table representing the modification of the engineered CDS sequences
-    This modifications will be vocabulary restricted: 
-    truncated, fusion, synthetic, mutated, domesticated """
-    
+    This modifications will be vocabulary restricted:
+    truncated, fusion, synthetic, mutated, domesticated"""
+
     __tablename__ = "modification"
-       
+
     # Define table content:
     modification_id = Column(Integer, primary_key=True, autoincrement=True)
-    modification_type = Column(String, nullable=False) # vocabulary restricted
+    modification_type = Column(String, nullable=False)  # vocabulary restricted
     modification_description = Column(String, nullable=False)
-    
-    UniqueConstraint (modification_type, modification_description)
+
+    UniqueConstraint(modification_type, modification_description)
 
     # Introduce all relationship between tables:
-    modifications: Mapped["CdsModification"] = relationship(back_populates="modification")
+    modifications: Mapped["CdsModification"] = relationship(
+        back_populates="modification"
+    )
+
 
 class CdsModification(Base):
     """Linker table, CDS to modification cross-reference"""
@@ -227,16 +241,15 @@ class CdsModification(Base):
     __table_args__ = (PrimaryKeyConstraint("cds_id", "modification_id"),)
 
     # Define table content:
-    cds_id: Mapped[int] = mapped_column(
-        ForeignKey("cds.cds_id")
-    )
+    cds_id: Mapped[int] = mapped_column(ForeignKey("cds.cds_id"))
     modification_id: Mapped[int] = mapped_column(
         ForeignKey("modification.modification_id")
     )
-    
+
     # Introduce all relationship between tables:
     modification: Mapped["Modification"] = relationship(back_populates="modifications")
     cds: Mapped["Cds"] = relationship(back_populates="modifications")
+
 
 class Name(Base):
     """Table representing a protein name
@@ -252,8 +265,9 @@ class Name(Base):
     )  # primary key column
     prot_name = Column(String, nullable=False)
 
- # Introduce all relationship between tables:
+    # Introduce all relationship between tables:
     proteins: Mapped[list["ProteinName"]] = relationship(back_populates="name")
+
 
 class ProteinName(Base):
     """Linker table, protein to name cross-reference
@@ -268,13 +282,14 @@ class ProteinName(Base):
     )
     name_id: Mapped[int] = mapped_column(
         ForeignKey("name.name_id"),
-    ) 
+    )
 
     # Introduce all relationship between tables:
     name: Mapped["Name"] = relationship(back_populates="proteins")
     protein: Mapped["Protein"] = relationship(back_populates="names")
 
-class Isoforms (Base):
+
+class Isoforms(Base):
     """Table representing the isoforms of a protein
     This table will store the canonical protein ID and the isoform protein ID.
     The canonical protein ID is the one that is considered the main protein,
@@ -285,16 +300,17 @@ class Isoforms (Base):
     __table_args__ = (PrimaryKeyConstraint("canonical__prot_id", "isoform__prot_id"),)
 
     # Define table content:
-    canonical__prot_id : Mapped[int] = mapped_column(
+    canonical__prot_id: Mapped[int] = mapped_column(
         ForeignKey("protein.prot_id"),
     )
-    isoform__prot_id : Mapped[int] = mapped_column(
+    isoform__prot_id: Mapped[int] = mapped_column(
         ForeignKey("protein.prot_id"),
-        )
-    
+    )
+
     # Introduce all relationship between tables:
-    isoform : Mapped["Protein"] = relationship(back_populates="isoforms")
+    isoform: Mapped["Protein"] = relationship(back_populates="isoforms")
     canonical: Mapped["Protein"] = relationship(back_populates="canonicals")
+
 
 class Complex(Base):
     """Table representing the complex that can be form by the interaction
@@ -308,29 +324,35 @@ class Complex(Base):
     __tablename__ = "complex"
 
     # Define table content:
-    complex_id = Column(Integer, primary_key=True, autoincrement=True)  
-    complex_name = Column(String, nullable=False)  
-    complex_type = Column(String, nullable=False) # Classification undecided (pdu,eut,grm..)
-    is_active = Column(String) # Active/Inactive. Boolean?
-    is_exp_tested = Column(String) #Y/N. Boolean?
-    complex_source = Column(String, nullable=False) 
+    complex_id = Column(Integer, primary_key=True, autoincrement=True)
+    complex_name = Column(String, nullable=False)
+    complex_type = Column(
+        String, nullable=False
+    )  # Classification undecided (pdu,eut,grm..)
+    is_active = Column(String)  # Active/Inactive. Boolean?
+    is_exp_tested = Column(String)  # Y/N. Boolean?
+    complex_source = Column(String, nullable=False)
     # Native/engineered/theoretical...
-    
-    UniqueConstraint("complex_name", "complex_type", "is_active",
-                     "is_exp_tested", "complex_source")
-    
+
+    UniqueConstraint(
+        "complex_name", "complex_type", "is_active", "is_exp_tested", "complex_source"
+    )
+
     # Introduce all relationship between tables:
     proteins: Mapped["ProteinComplex"] = relationship(
-        "ProteinComplex", secondary="protein_complex", back_populates="complexes", lazy="dynamic"
+        "ProteinComplex",
+        secondary="protein_complex",
+        back_populates="complexes",
+        lazy="dynamic",
     )
-    
+
+
 class ProteinComplex(Base):
     """Linker table, protein to complex cross-reference
     This table will store the protein ID and the complex ID"""
 
     __tablename__ = "protein_complex"
     __table_args__ = (PrimaryKeyConstraint("prot_id", "complex_id"),)
-
 
     # Define table content:
     prot_id: Mapped[int] = mapped_column(
@@ -339,14 +361,15 @@ class ProteinComplex(Base):
     complex_id: Mapped[int] = mapped_column(
         ForeignKey("complex.complex_id"),
     )
-    is_essential = Column(Boolean, default=False, nullable=True)  
+    is_essential = Column(Boolean, default=False, nullable=True)
     # Whether the protein is essential for the complex assembly
-    copy_number = Column(Integer, nullable=True) 
+    copy_number = Column(Integer, nullable=True)
     # Copy number of the protein in the complex
 
     # Introduce all relationship between tables:
     complex: Mapped["Complex"] = relationship(back_populates="proteins")
-    protein: Mapped["Protein"] = relationship(back_populates="complexes")    
+    protein: Mapped["Protein"] = relationship(back_populates="complexes")
+
 
 class Interaction(Base):
     """Table representing the different interactions
@@ -354,16 +377,21 @@ class Interaction(Base):
     """
 
     __tablename__ = "interaction"
-    
+
     # Define table content:
-    interact_id = Column(Integer, primary_key=True, autoincrement=True) 
-    interact_type = Column(String, nullable=False)  # Type of interaction (e.g: electrostatic, hydrophobic, etc)
-    interact_description = Column(String)  
-    
-    UniqueConstraint (interact_type, interact_description)
+    interact_id = Column(Integer, primary_key=True, autoincrement=True)
+    interact_type = Column(
+        String, nullable=False
+    )  # Type of interaction (e.g: electrostatic, hydrophobic, etc)
+    interact_description = Column(String)
+
+    UniqueConstraint(interact_type, interact_description)
 
     # Introduce all relationship between tables:
-    interactions: Mapped["Prot_prot_interact"] = relationship(back_populates="interaction")
+    interactions: Mapped["Prot_prot_interact"] = relationship(
+        back_populates="interaction"
+    )
+
 
 class Prot_prot_interact(Base):
     """Table representing the different specific interactions
@@ -388,19 +416,18 @@ class Prot_prot_interact(Base):
 
     # To enforce unique no repeated protein to protein interactions are created
     UniqueConstraint("prot_id_1", "prot_id_2", "interaction_id")
-    
+
     # Introduce all relationship between tables:
     protein_1: Mapped["Protein"] = relationship(back_populates="interaction_1")
     protein_2: Mapped["Protein"] = relationship(back_populates="interaction_2")
     interaction: Mapped["Interaction"] = relationship(back_populates="interactions")
 
 
-
-''' Functions to add data to the database'''
+""" Functions to add data to the database"""
 
 # # Function for protein data addition
 # def protein_addition(session, protaccession, protseq, struct, canonical):
-    
+
 #     '''
 #     Args:
 #     protseq (str): Protein sequence.
@@ -463,7 +490,7 @@ class Prot_prot_interact(Base):
 
 # # Function for Xdatabase data addition
 # def xdatabase_addition(session, xname, href, xtype):
-    
+
 #     ''' Args:
 #     xdb_name (str): Database name.
 #     href (str): Database URL.
@@ -546,7 +573,7 @@ class Prot_prot_interact(Base):
 #         print(f"Cds {cdsseq[:10]=} with accession {cdsaccession=} added")
 #     else:
 #         print(f"This CDS {cdsseq[:10]=} with accession {cdsaccession=} has already being added")
-    
+
 #     print(f"Cds row returned: {cds}")
 
 #     return cds  # Return the cds row we just added to the db/otherwise dealt with
@@ -559,18 +586,18 @@ class Prot_prot_interact(Base):
 #         cds: Cds ORM object
 #         protein: Protein ORM object
 #         xrefacc (str): accession string for this external reference
-    
+
 #     Explanation on how the code works:
 #     1. Check if the xref already exists,  store it in the `xref` variable
 #     2. If the xref does not exist, create a new xref object and add it to the
 #        session
-    
+
 #     Need to think on how to do that, condition depending on type of database?
 #     3. Check if the xref is already associated with the cds_xref, and if not
 #        create a new `cds_xref` object and add it to the session
 #     4. Check if the xref is already associated with the prot_xref, and if not
 #        create a new `prot_xref` object and add it to the session
-    
+
 #     4. Commit the session to the database
 #     '''
 
@@ -628,7 +655,6 @@ class Prot_prot_interact(Base):
 #         print(f"Linked CDS {cds} <-> Xref {xref}")
 #     else:
 #         print(f"CDS {cds} already linked to Xref {xref}")
-
 
 
 #     return xref  # Return the renference row we just added to the db/otherwise dealt with
@@ -691,11 +717,6 @@ class Prot_prot_interact(Base):
 #         return name  # Return the gene row we just added to the db/otherwise dealt with
 
 
-
-
-
-
-
 # Function to create the database and tables
 def create_db(dbpath: Path):
     """Function to create all the tables from the database"""
@@ -706,6 +727,7 @@ def create_db(dbpath: Path):
     Base.metadata.create_all(bind=engine)
     print("Database and tables created successfully")
 
+
 # Function to get a live session to the database
 def get_session(dbpath: Path):
     """Returns live session to database."""
@@ -714,17 +736,9 @@ def get_session(dbpath: Path):
     Session.configure(bind=engine)
     return Session()
 
+
 if __name__ == "__main__":
     create_db(Path("db.sqlite3"))
-
-
-
-
-
-
-
-
-
 
 
 ## How to populate parent child relationships for CDS
