@@ -38,7 +38,32 @@ class DatabaseType(Enum):
     TAXONOMY = "TAXONOMY"
     # OTHER = "OTHER" Unsure if needed?
 
+@unique
+class StructProtType(Enum):
+    """Enum for classifying types of structural proteins."""
+    HEXAMER= "HEXAMER"
+    TRIMER = "TRIMER"
+    PENTAMER = "PENTAMER"
+    OTHER = "OTHER"
 
+@unique
+class ModificationType(Enum):
+    """Enum for classifying types of protein modifications."""
+    TRUNCATED = "TRUNCATED"
+    EXTENDED = "EXTENDED"
+    FUSION = "FUSION"
+    SYNTHETIC = "SYNTHETIC"
+    MUTATED = "MUTATED"
+    DOMESTICATED = "DOMESTICATED"
+
+
+@unique
+class ComplexSource(Enum):
+    """Enum for classifying sources of protein complexes."""
+    NATIVE = "NATIVE"
+    ENGINEERED = "ENGINEERED"
+    PREDICTED = "PREDICTED"
+    THEORETICAL = "THEORETICAL" # same than predicted? need to describe differences
 
 # ---- Testing ----
 
@@ -46,14 +71,14 @@ if __name__ == "__main__":
     print("Testing DatabaseType Enum...\n")
 
     # List all members for testing this works. Remove after
-    for db_type in DatabaseType:
+    for db_type in ModificationType:
         print(f"{db_type.name} = {db_type.value}")
 
     print("\nTesting helper function:")
     print("\nDatabaseType tests:")
-    for label in ["seq", "STRUCTURE", " tax ", "invalid"]:
+    for label in ["BMC-H", "MUTATED", " fuse ", "FUSION", "invalid"]:
         try:
-            result = enum_from_str(DatabaseType, label)
+            result = enum_from_str(ModificationType, label)
             print(f"{label!r} -> {result}")
         except ValueError as e:
             print(f"{label!r} -> Error: {e}")

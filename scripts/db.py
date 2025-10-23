@@ -8,7 +8,7 @@ import logging  # We'll use this to report program state and other things to the
 import sys
 
 from pathlib import Path  # for type hints
-from .enums import DatabaseType,   enum_from_str
+from .enums import DatabaseType,   StructProtType, ModificationType, enum_from_str
 # Import  SQLAlchemy classes needed with a declarative approach.
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy import (
@@ -59,9 +59,7 @@ class Protein(Base):
         Integer, nullable=False, unique=True
     )  # Unique accession number for proteins ( I want to automate it, any suggestions on resources for this?)
     prot_seq = Column(String, nullable=False, unique=True)
-    struct_prot_type = Column(
-        Integer, nullable=True
-    )  # BMC type H/T/P or non structural
+    struct_prot_type = Column(SQLEnum(StructProtType, name="struct_prot_type_enum"))
     is_canonical = Column(Boolean, default=True)  # Only false if it is an isoform
 
     # Define type of output for protein
@@ -224,7 +222,7 @@ class Modification(Base):
 
     # Define table content:
     modification_id = Column(Integer, primary_key=True, autoincrement=True)
-    modification_type = Column(String, nullable=False)  # vocabulary restricted
+    modification_type = Column(SQLEnum(ModificationType, name="modification_type_enum"), nullable=False)
     modification_description = Column(String, nullable=False)
 
     UniqueConstraint(modification_type, modification_description)
@@ -332,8 +330,7 @@ class Complex(Base):
     )  # Classification undecided (pdu,eut,grm..)
     is_active = Column(String)  # Active/Inactive. Boolean?
     is_exp_tested = Column(String)  # Y/N. Boolean?
-    complex_source = Column(String, nullable=False)
-    # Native/engineered/theoretical...
+    complex_source = Column(SQLEnum(ComplexSource, name="complex_source_enum"), nullable=False)
 
     UniqueConstraint(
         "complex_name", "complex_type", "is_active", "is_exp_tested", "complex_source"
@@ -455,6 +452,15 @@ class Prot_prot_interact(Base):
 #     print(
 #         f"Before query, {protseq[:10]=}..., {protaccession=}, {struct=}, {canonical=}"
 #     )
+
+    # Check and convert xtype
+    # if isinstance(xtype, str):
+    #     try:
+    #         xtype = enum_from_str(StructProtType, xtype)
+    #     except ValueError as e:
+    #         print(f"Invalid protein type: {xtype!r} — {e}")
+    #         return None
+
 #     # Create a new protein object
 #     protein = (
 #         session.query(Protein)
