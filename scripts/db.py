@@ -8,7 +8,7 @@ import logging  # We'll use this to report program state and other things to the
 import sys
 
 from pathlib import Path  # for type hints
-
+from .enums import DatabaseType,   enum_from_str
 # Import  SQLAlchemy classes needed with a declarative approach.
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy import (
@@ -99,9 +99,7 @@ class Xdatabase(Base):
     xref_db_id = Column(Integer, primary_key=True)
     xref_db_name = Column(String, nullable=False, unique=True)
     xref_href = Column(String, nullable=False, unique=True)  # URL for database access
-    xref_type = Column(
-        String, nullable=False
-    )  # types of database: seq, struct, funct, tax'
+    xref_type = Colun(SQLEnum(DatabaseType, name ="database_type_enum", nullable=False))
 
     # Introduce all relationship between tables:
     xref: Mapped["Xref"] = relationship(back_populates="xref_db_id")
@@ -509,6 +507,19 @@ class Prot_prot_interact(Base):
 #     print(f"\nNow in {xdatabase_addition.__name__}")
 #     print(f"Before query, {xname=}, {href=}, {xtype=}")
 
+    # Check and convert xtype
+    # if isinstance(xtype, str):
+    #     try:
+    #         xtype = enum_from_str(DatabaseType, xtype)
+    #     except ValueError as e:
+    #         print(f"Invalid database type: {xtype!r} — {e}")
+    #         return None
+
+    # elif not isinstance(xtype, DatabaseType):
+    #     print(f"xtype must be a string or DatabaseType, got {type(xtype)}")
+    #     return None
+    # print(f"Converted xtype to Enum: {xtype}")
+    
 #     # Create a new db object
 #     xdb = (
 #         session.query(Xdatabase)
