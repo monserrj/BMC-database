@@ -782,6 +782,9 @@ if __name__ == "__main__":
     logger.info("Creating and populating database at %s", outdbpath)
     create_db(outdbpath)
 
+    # Render database as an ER diagram
+    from eralchemy import render_er
+    render_er(Base, 'er_diagram.pdf')
 
 ## How to populate parent child relationships for CDS
 # Suppose we have CDS with the following relationships
