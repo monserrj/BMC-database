@@ -17,7 +17,7 @@ from enum import (
 from pathlib import Path  # for type hints
 from typing import Optional
 
-from enums import DatabaseType, StructProtType, ModificationType, enum_from_str
+from enums import DatabaseType, StructProtType, enum_from_str
 
 # Import  SQLAlchemy classes needed with a declarative approach.
 from sqlalchemy.orm import sessionmaker
@@ -60,7 +60,7 @@ Session = sessionmaker()  # We also need a Session object for database connectio
 
 
 class Protein(Base):
-    """Protein table, where each row describes a unique protein.
+    """Each row describes a unique protein.
 
     The table stores
 
@@ -114,37 +114,43 @@ class Protein(Base):
 
 
 class Xdatabase(Base):
-    """Descriptions of external databases (linked by Xref accessions)"""
+    """Each row describes an external database"""
 
     __tablename__ = "xdatabase"
 
-    # Define table content:
-    xref_db_id = Column(Integer, primary_key=True)
-    xref_db_name = Column(String, nullable=False, unique=True)
-    xref_href = Column(String, nullable=False, unique=True)  # URL for database access
+    # Define database row using Declarative
+    xref_db_id: Mapped[int] = mapped_column(
+        primary_key=True, autoincrement=True
+    )  # Local id for database
+    xref_db_name: Mapped[str] = mapped_column(
+        nullable=False, unique=True
+    )  # Database with crossref
+    xref_href: Mapped[str] = mapped_column(
+        nullable=False, unique=True
+    )  # URL to database
     #    xref_type = Column(SQLEnum(DatabaseType, name ="database_type_enum", nullable=False))   # Not currently defined
 
-    # Introduce all relationship between tables:
+    # Define relationships using Declarative
     xref: Mapped["Xref"] = relationship(back_populates="xref_db_id")
     databases: Mapped[list["Xref"]] = relationship()
 
 
 class Xref(Base):  # All external references
-    """Table representing a singe database cross-reference"""
+    """Each row describes an external database cross-reference"""
 
     __tablename__ = "xref"
 
     # Define table content:
-    xref_id = Column(Integer, primary_key=True, autoincrement=True)
-    xref_acc_ext = Column(
-        String, unique=True, nullable=False
-    )  # Accession from external db
+    xref_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    xref_acc_ext: Mapped[str] = mapped_column(
+        nullable=False, unique=True
+    )  # External DB accession
     xref_db_id: Mapped[int] = mapped_column(
         ForeignKey("xdatabase.xref_db_id"),
         nullable=False,
     )
 
-    # Introduce all relationships between tables
+    # Define relationships using Declarative
     xref_db: Mapped["Xdatabase"] = relationship(back_populates="databases")
     proteins: Mapped["ProteinXref"] = relationship(back_populates="xref")
     cdss: Mapped["CdsXref"] = relationship(back_populates="cds")
@@ -154,8 +160,7 @@ class ProteinXref(Base):
     """Linker table, protein to database cross-reference"""
 
     __tablename__ = "protein_xref"
-    # For linker tables, we need to set a PrimaryKeyConstraint,
-    # so SQLite knows what the primary key is for the table
+    # Require a unique combination of protein ID and crossreference ID
     __table_args__ = (PrimaryKeyConstraint("prot_id", "xref_id"),)
 
     prot_id: Mapped[int] = mapped_column(
@@ -165,7 +170,7 @@ class ProteinXref(Base):
         ForeignKey("xref.xref_id"),
     )
 
-    # Introduce all relationship between tables:
+    # Define relationships using Declarative
     protein: Mapped["Protein"] = relationship(back_populates="references")
     xref: Mapped["Xref"] = relationship(back_populates="proteins")
 
