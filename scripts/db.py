@@ -4,6 +4,10 @@
 followed and explanations needed kept to help following through
 the process."""
 
+#######################################################
+# (1) Imports
+#######################################################
+
 import logging  # We'll use this to report program state and other things to the user
 import sys
 
@@ -29,15 +33,18 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.orm import sessionmaker  # Import a sessionmaker to create a session object
 from sqlalchemy import create_engine     # Create_engine function to create an engine object
 
-# Database set up:
-# Create a base class to inherit from.
-Base = declarative_base()
+#######################################################
+# (2) Generic SQLAlchemy configuration
+#######################################################
 
-# Session set up:
-Session = sessionmaker()  # we also need a session object
+Base = declarative_base()   # Create a Base instance to inherit from.
+Session = sessionmaker()    # We also need a Session object for database connections
 
 
-# Declare tables
+#######################################################
+# (3) Define the database structure
+####################################################### 
+
 class Protein(Base):
     """Table representing a protein This table will store the protein sequence,
     unique accession number, type of protein structure and whether is
@@ -728,6 +735,10 @@ class Prot_prot_interact(Base):
 
 #         return name  # Return the gene row we just added to the db/otherwise dealt with
 
+#######################################################
+# (4) Helper functions that use the definitions to 
+#     construct or interact with the database
+#######################################################
 
 # Function to create the database and tables
 def create_db(dbpath: Path):
@@ -748,6 +759,10 @@ def get_session(dbpath: Path):
     Session.configure(bind=engine)
     return Session()
 
+#######################################################
+# (5) Code that runs when this file is called as
+#     a script
+#######################################################
 
 if __name__ == "__main__":
     # Set up logging
