@@ -7,8 +7,11 @@ the process."""
 import logging  # We'll use this to report program state and other things to the user
 import sys
 
+from enum import Enum     # To create enumerations for some of the vocabulary restricted fields
 from pathlib import Path  # for type hints
-from .enums import DatabaseType,   StructProtType, ModificationType, enum_from_str
+from typing import Optional
+
+from enums import DatabaseType, StructProtType, ModificationType, enum_from_str
 # Import  SQLAlchemy classes needed with a declarative approach.
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy import (
@@ -23,20 +26,10 @@ from sqlalchemy import (
     or_,
 )
 from sqlalchemy.orm import relationship, Mapped, mapped_column
-
-# Import a sessionmaker to create a session object
-from sqlalchemy.orm import sessionmaker
-
-# Create_engine function to create an engine object
-from sqlalchemy import create_engine
-
-from typing import Optional
-
-# To create enumerations for some of the vocabulary restricted fields
-from enum import Enum
+from sqlalchemy.orm import sessionmaker  # Import a sessionmaker to create a session object
+from sqlalchemy import create_engine     # Create_engine function to create an engine object
 
 # Database set up:
-
 # Create a base class to inherit from.
 Base = declarative_base()
 
@@ -59,7 +52,7 @@ class Protein(Base):
         Integer, nullable=False, unique=True
     )  # Unique accession number for proteins ( I want to automate it, any suggestions on resources for this?)
     prot_seq = Column(String, nullable=False, unique=True)
-    struct_prot_type = Column(SQLEnum(StructProtType, name="struct_prot_type_enum"))
+#    struct_prot_type = Column(SQLEnum(StructProtType, name="struct_prot_type_enum"))  # Not currently defined
     is_canonical = Column(Boolean, default=True)  # Only false if it is an isoform
 
     # Define type of output for protein
@@ -97,7 +90,7 @@ class Xdatabase(Base):
     xref_db_id = Column(Integer, primary_key=True)
     xref_db_name = Column(String, nullable=False, unique=True)
     xref_href = Column(String, nullable=False, unique=True)  # URL for database access
-    xref_type = Colun(SQLEnum(DatabaseType, name ="database_type_enum", nullable=False))
+#    xref_type = Column(SQLEnum(DatabaseType, name ="database_type_enum", nullable=False))   # Not currently defined
 
     # Introduce all relationship between tables:
     xref: Mapped["Xref"] = relationship(back_populates="xref_db_id")
@@ -222,10 +215,9 @@ class Modification(Base):
 
     # Define table content:
     modification_id = Column(Integer, primary_key=True, autoincrement=True)
-    modification_type = Column(SQLEnum(ModificationType, name="modification_type_enum"), nullable=False)
     modification_description = Column(String, nullable=False)
-
-    UniqueConstraint(modification_type, modification_description)
+#    modification_type = Column(SQLEnum(ModificationType, name="modification_type_enum"), nullable=False)   # Not currently defined
+#    UniqueConstraint(modification_type, modification_description)  # Not currently defined
 
     # Introduce all relationship between tables:
     modifications: Mapped["CdsModification"] = relationship(
@@ -330,7 +322,7 @@ class Complex(Base):
     )  # Classification undecided (pdu,eut,grm..)
     is_active = Column(String)  # Active/Inactive. Boolean?
     is_exp_tested = Column(String)  # Y/N. Boolean?
-    complex_source = Column(SQLEnum(ComplexSource, name="complex_source_enum"), nullable=False)
+#    complex_source = Column(SQLEnum(ComplexSource, name="complex_source_enum"), nullable=False)  # Not currently defined
 
     UniqueConstraint(
         "complex_name", "complex_type", "is_active", "is_exp_tested", "complex_source"
