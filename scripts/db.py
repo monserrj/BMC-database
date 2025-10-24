@@ -11,13 +11,16 @@ the process."""
 import logging  # We'll use this to report program state and other things to the user
 import sys
 
-from enum import Enum     # To create enumerations for some of the vocabulary restricted fields
+from enum import (
+    Enum,
+)  # To create enumerations for some of the vocabulary restricted fields
 from pathlib import Path  # for type hints
 from typing import Optional
 
 from enums import DatabaseType, StructProtType, ModificationType, enum_from_str
+
 # Import  SQLAlchemy classes needed with a declarative approach.
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy import (
     Boolean,
     Column,
@@ -29,51 +32,63 @@ from sqlalchemy import (
     String,
     or_,
 )
-from sqlalchemy.orm import relationship, Mapped, mapped_column
-from sqlalchemy.orm import sessionmaker  # Import a sessionmaker to create a session object
-from sqlalchemy import create_engine     # Create_engine function to create an engine object
+from sqlalchemy.orm import DeclarativeBase, relationship, Mapped, mapped_column
+from sqlalchemy.orm import (
+    sessionmaker,
+)  # Import a sessionmaker to create a session object
+from sqlalchemy import (
+    create_engine,
+)  # Create_engine function to create an engine object
 
 #######################################################
 # (2) Generic SQLAlchemy configuration
 #######################################################
 
-Base = declarative_base()   # Create a Base instance to inherit from.
-Session = sessionmaker()    # We also need a Session object for database connections
+
+class Base(DeclarativeBase):
+    """Declarative base class"""
+
+    pass
+
+
+Session = sessionmaker()  # We also need a Session object for database connections
 
 
 #######################################################
 # (3) Define the database structure
-####################################################### 
+#######################################################
+
 
 class Protein(Base):
-    """Table representing a protein This table will store the protein sequence,
-    unique accession number, type of protein structure and whether is
-    canonical and isoform.
+    """Protein table, where each row describes a unique protein.
+
+    The table stores
+
+    - protein sequence,
+    - unique accession ID
+    - type of protein structure
+    - canonical or isoform
     """
 
     __tablename__ = "protein"  # this is the name that will be used in SQLite
 
-    # Define table content:
-    prot_id = Column(Integer, primary_key=True, autoincrement=True)
-    prot_accession = Column(
-        Integer, nullable=False, unique=True
-    )  # Unique accession number for proteins ( I want to automate it, any suggestions on resources for this?)
-    prot_seq = Column(String, nullable=False, unique=True)
-#    struct_prot_type = Column(SQLEnum(StructProtType, name="struct_prot_type_enum"))  # Not currently defined
-    is_canonical = Column(Boolean, default=True)  # Only false if it is an isoform
+    # Define Protein table columns using Declarative:
+    prot_id: Mapped[Optional[int]] = mapped_column(
+        primary_key=True, autoincrement=True
+    )  # Autopopulated ID for local table
+    prot_accession: Mapped[Optional[int]] = mapped_column(
+        nullable=False, unique=True
+    )  # A unique accession number, must be present
+    prot_seq: Mapped[Optional[str]] = mapped_column(nullable=False, unique=True)
+    is_canonical: Mapped[Optional[bool]] = mapped_column(
+        default=True
+    )  # True/False flag for whether this protein is canonical
+    #    struct_prot_type = Column(SQLEnum(StructProtType, name="struct_prot_type_enum"))  # Not currently defined
+    is_canonical = Column(
+        Boolean, default=True
+    )  # Only True if this is the canonical protein sequence (isoforms are set to False)
 
-    # Define type of output for protein
-    def __str__(self):
-        outstr = [
-            f"Protein ID: {self.prot_id}",
-            f"Protein accession: {self.prot_id}Protein sequence: {self.prot_seq}",
-            f"Protein structure type: {self.struct_prot_type}",
-            f"Protein is canonical: {self.is_canonical}",
-        ]
-        return "\n".join(outstr)
-
-    # Unsure if needed, but to keep the code consistent with the rest of the db
-    # Introduce all relationship between tables:
+    # Define relationships to other tables in Declarative
     references: Mapped["ProteinXref"] = relationship(back_populates="protein")
     cds: Mapped["Cds"] = relationship(back_populates="protein")
     names: Mapped["ProteinName"] = relationship(back_populates="protein")
@@ -87,6 +102,16 @@ class Protein(Base):
         back_populates="protein_2"
     )
 
+    # Define string representation of protein row
+    def __str__(self):
+        outstr = [
+            f"Protein ID: {self.prot_id}",
+            f"Protein accession: {self.prot_id}, Protein sequence: {self.prot_seq}",
+            f"Protein structure type: {self.struct_prot_type}",
+            f"Protein is canonical: {self.is_canonical}",
+        ]
+        return "\n".join(outstr)
+
 
 class Xdatabase(Base):
     """Descriptions of external databases (linked by Xref accessions)"""
@@ -97,7 +122,7 @@ class Xdatabase(Base):
     xref_db_id = Column(Integer, primary_key=True)
     xref_db_name = Column(String, nullable=False, unique=True)
     xref_href = Column(String, nullable=False, unique=True)  # URL for database access
-#    xref_type = Column(SQLEnum(DatabaseType, name ="database_type_enum", nullable=False))   # Not currently defined
+    #    xref_type = Column(SQLEnum(DatabaseType, name ="database_type_enum", nullable=False))   # Not currently defined
 
     # Introduce all relationship between tables:
     xref: Mapped["Xref"] = relationship(back_populates="xref_db_id")
@@ -223,8 +248,8 @@ class Modification(Base):
     # Define table content:
     modification_id = Column(Integer, primary_key=True, autoincrement=True)
     modification_description = Column(String, nullable=False)
-#    modification_type = Column(SQLEnum(ModificationType, name="modification_type_enum"), nullable=False)   # Not currently defined
-#    UniqueConstraint(modification_type, modification_description)  # Not currently defined
+    #    modification_type = Column(SQLEnum(ModificationType, name="modification_type_enum"), nullable=False)   # Not currently defined
+    #    UniqueConstraint(modification_type, modification_description)  # Not currently defined
 
     # Introduce all relationship between tables:
     modifications: Mapped["CdsModification"] = relationship(
@@ -329,7 +354,7 @@ class Complex(Base):
     )  # Classification undecided (pdu,eut,grm..)
     is_active = Column(String)  # Active/Inactive. Boolean?
     is_exp_tested = Column(String)  # Y/N. Boolean?
-#    complex_source = Column(SQLEnum(ComplexSource, name="complex_source_enum"), nullable=False)  # Not currently defined
+    #    complex_source = Column(SQLEnum(ComplexSource, name="complex_source_enum"), nullable=False)  # Not currently defined
 
     UniqueConstraint(
         "complex_name", "complex_type", "is_active", "is_exp_tested", "complex_source"
@@ -452,13 +477,13 @@ class Prot_prot_interact(Base):
 #         f"Before query, {protseq[:10]=}..., {protaccession=}, {struct=}, {canonical=}"
 #     )
 
-    # Check and convert xtype
-    # if isinstance(xtype, str):
-    #     try:
-    #         xtype = enum_from_str(StructProtType, xtype)
-    #     except ValueError as e:
-    #         print(f"Invalid protein type: {xtype!r} — {e}")
-    #         return None
+# Check and convert xtype
+# if isinstance(xtype, str):
+#     try:
+#         xtype = enum_from_str(StructProtType, xtype)
+#     except ValueError as e:
+#         print(f"Invalid protein type: {xtype!r} — {e}")
+#         return None
 
 #     # Create a new protein object
 #     protein = (
@@ -512,19 +537,19 @@ class Prot_prot_interact(Base):
 #     print(f"\nNow in {xdatabase_addition.__name__}")
 #     print(f"Before query, {xname=}, {href=}, {xtype=}")
 
-    # Check and convert xtype
-    # if isinstance(xtype, str):
-    #     try:
-    #         xtype = enum_from_str(DatabaseType, xtype)
-    #     except ValueError as e:
-    #         print(f"Invalid database type: {xtype!r} — {e}")
-    #         return None
+# Check and convert xtype
+# if isinstance(xtype, str):
+#     try:
+#         xtype = enum_from_str(DatabaseType, xtype)
+#     except ValueError as e:
+#         print(f"Invalid database type: {xtype!r} — {e}")
+#         return None
 
-    # elif not isinstance(xtype, DatabaseType):
-    #     print(f"xtype must be a string or DatabaseType, got {type(xtype)}")
-    #     return None
-    # print(f"Converted xtype to Enum: {xtype}")
-    
+# elif not isinstance(xtype, DatabaseType):
+#     print(f"xtype must be a string or DatabaseType, got {type(xtype)}")
+#     return None
+# print(f"Converted xtype to Enum: {xtype}")
+
 #     # Create a new db object
 #     xdb = (
 #         session.query(Xdatabase)
@@ -736,9 +761,10 @@ class Prot_prot_interact(Base):
 #         return name  # Return the gene row we just added to the db/otherwise dealt with
 
 #######################################################
-# (4) Helper functions that use the definitions to 
+# (4) Helper functions that use the definitions to
 #     construct or interact with the database
 #######################################################
+
 
 # Function to create the database and tables
 def create_db(dbpath: Path):
@@ -758,6 +784,7 @@ def get_session(dbpath: Path):
     engine = create_engine(db_URL)
     Session.configure(bind=engine)
     return Session()
+
 
 #######################################################
 # (5) Code that runs when this file is called as
@@ -779,12 +806,13 @@ if __name__ == "__main__":
     outdbpath = Path("db.sqlite3")
 
     # Create database
-    logger.info("Creating and populating database at %s", outdbpath)
+    logger.info("Creating database at %s", outdbpath)
     create_db(outdbpath)
 
     # Render database as an ER diagram
     from eralchemy import render_er
-    render_er(Base, 'er_diagram.pdf')
+
+    render_er(Base, "er_diagram.pdf")
 
 ## How to populate parent child relationships for CDS
 # Suppose we have CDS with the following relationships
