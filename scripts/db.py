@@ -76,7 +76,7 @@ class Protein(Base):
     prot_id: Mapped[Optional[int]] = mapped_column(
         primary_key=True, autoincrement=True
     )  # Autopopulated ID for local table
-    prot_accession: Mapped[Optional[int]] = mapped_column(
+    prot_accession: Mapped[Optional[str]] = mapped_column(
         nullable=False, unique=True
     )  # A unique accession number, must be present
     prot_seq: Mapped[Optional[str]] = mapped_column(nullable=False, unique=True)
@@ -84,9 +84,6 @@ class Protein(Base):
         default=True
     )  # True/False flag for whether this protein is canonical
     #    struct_prot_type = Column(SQLEnum(StructProtType, name="struct_prot_type_enum"))  # Not currently defined
-    is_canonical = Column(
-        Boolean, default=True
-    )  # Only True if this is the canonical protein sequence (isoforms are set to False)
 
     # Define relationships to other tables in Declarative
     references: Mapped["ProteinXref"] = relationship(back_populates="protein")
@@ -176,21 +173,29 @@ class ProteinXref(Base):
 
 
 class Cds(Base):
-    """Table representing the gene details linked to a protein
-    This table will store the gene ID, DNA sequence,
-    origin sequences if engineered, accession number and the corresponding
-    protein
+    """ Each row describes a unique CDS.
+    
+    The table stores
+    
+    - gene ID,
+    - DNA sequence,
+    - origin sequences if engineered,
+    - accession number
+    - and the corresponding protein.
     """
 
     __tablename__ = "cds"
 
-    # Define table content:
-    cds_id = Column(Integer, primary_key=True)
-    cds_seq = Column(String, nullable=False, unique=True)
-    cds_accession = Column(
-        String, nullable=False, unique=True
-    )  # Unique accession number for CDS
-
+    # Define table content  using declarative:
+    cds_id: Mapped[int] = mapped_column(
+        primary_key=True, autoincrement=True
+    )  # Autopopulated ID for local table
+    cds_seq: Mapped[str] = mapped_column(
+        nullable=False, unique=True
+    )  # Gene DNA sequence
+    cds_accession: Mapped[str] = mapped_column(
+        nullable=False, unique=True
+    )  # Unique accession number for CD
     prot_id: Mapped[int] = mapped_column(ForeignKey("protein.prot_id"), nullable=False)
 
     # Introduce all relationship between tables: Check this?
@@ -202,19 +207,21 @@ class Cds(Base):
 
 
 class Origin(Base):
-    """Table representing the original DNA sequence of a modified CDS
-    This table will store the original DNA sequence and the corresponding
-    modified CDS sequence id
+    """ Each row describes the link between original and modified CDS.
+    
+    The table stores
+    
+    - original DNA sequence id,
+    - the corresponding modified CDS id.
     """
 
     __tablename__ = "origin"
     __table_args__ = (PrimaryKeyConstraint("origin_id", "cds_id"),)
 
     # Define table content:
-    # Should I change names here?
     origin_id: Mapped[int] = mapped_column(
         ForeignKey("cds.cds_id"), nullable=False
-    )  # Original CDS sequence (cds_id key)
+    )  # Foreign key, original CDS sequence (cds_id key)
     cds_id: Mapped[int] = mapped_column(
         ForeignKey("cds.cds_id"), nullable=False
     )  # Foreign key, modified CDS sequence (cds_id key)
@@ -244,17 +251,26 @@ class CdsXref(Base):
 
 
 class Modification(Base):
-    """Table representing the modification of the engineered CDS sequences
-    This modifications will be vocabulary restricted:
-    truncated, fusion, synthetic, mutated, domesticated"""
+    """ Each row represents a unique modification applied to a CDS.
+    
+    
+    The table stores
+    
+    - modification ID,
+    - modification type (enum): truncated, extended, fusion, synthetic, mutated, domesticated,
+    - description of the modification.
+    """
 
     __tablename__ = "modification"
+    # __table_args__ = (UniqueConstraint("modification_description", "modification_type"),)
 
-    # Define table content:
-    modification_id = Column(Integer, primary_key=True, autoincrement=True)
-    modification_description = Column(String, nullable=False)
+    # Define table content using declarative:
+    modification_id: Mapped[int] = mapped_column(
+        primary_key=True, autoincrement=True
+    )  # Autopopulated ID for local table
+    modification_description: Mapped[str] = mapped_column(nullable=False)
+        
     #    modification_type = Column(SQLEnum(ModificationType, name="modification_type_enum"), nullable=False)   # Not currently defined
-    #    UniqueConstraint(modification_type, modification_description)  # Not currently defined
 
     # Introduce all relationship between tables:
     modifications: Mapped["CdsModification"] = relationship(
