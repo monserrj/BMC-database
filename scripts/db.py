@@ -279,7 +279,13 @@ class Modification(Base):
 
 
 class CdsModification(Base):
-    """Linker table, CDS to modification cross-reference"""
+    """ Each row represents a unique modification applied to a CDS.
+    
+    The table stores
+    
+    - modification ID,
+    - CDS ID.
+    """
 
     __tablename__ = "cds_modification"
     __table_args__ = (PrimaryKeyConstraint("cds_id", "modification_id"),)
@@ -296,26 +302,38 @@ class CdsModification(Base):
 
 
 class Name(Base):
-    """Table representing a protein name
-    Each name_ID represents a protein name. Several name strings
-    given to an unique protein, and several proteins sharing same name
+    """ Each row describes a protein name.
+    
+    The table stores
+    
+    - name ID,
+    - protein name.
+    
+
     """
 
     __tablename__ = "name"
 
-    # Define table content:
-    name_id = Column(
-        Integer, primary_key=True, autoincrement=True
+    # Define table content in Declarative:
+    name_id: Mapped[int] = mapped_column(
+        primary_key=True, autoincrement=True
     )  # primary key column
-    prot_name = Column(String, nullable=False)
+    prot_name: Mapped[str] = mapped_column(nullable=False)
 
     # Introduce all relationship between tables:
     proteins: Mapped[list["ProteinName"]] = relationship(back_populates="name")
 
 
 class ProteinName(Base):
-    """Linker table, protein to name cross-reference
-    This table will store the protein ID and the name ID"""
+    """ Each row describes a protein name associated to a protein.
+    
+    The table stores
+    
+    - protein ID,
+    - name ID.
+    Several proteins can share the same name
+    A name can be shared by several proteins
+    """
 
     __tablename__ = "protein_name"
     __table_args__ = (PrimaryKeyConstraint("prot_id", "name_id"),)
@@ -334,10 +352,15 @@ class ProteinName(Base):
 
 
 class Isoforms(Base):
-    """Table representing the isoforms of a protein
-    This table will store the canonical protein ID and the isoform protein ID.
-    The canonical protein ID is the one that is considered the main protein,
-    while the isoform protein ID is a variant of the canonical protein.
+    """ Each row describes a protein isoform relationship with its canonical protein.
+    
+    The table stores
+    
+    - canonical protein ID,
+    - isoform protein ID.
+    
+    Several isoforms can be associated to a canonical protein.
+    An isoform can only be associated to one canonical protein.
     """
 
     __tablename__ = "isoforms"
