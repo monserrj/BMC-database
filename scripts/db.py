@@ -380,29 +380,38 @@ class Isoforms(Base):
 
 
 class Complex(Base):
-    """Table representing the complex that can be form by the interaction
-    between several proteins, including native BMC or engineered ones
-    This table will store the complex features, including the type (e.g: pdu, eut),
-    whether is has enzymatic activty or not, if it has been experimentally tested
-    whether it assembles or not, the origin of the complex in a restricted vocabulary (meaning whether is it
-    a native complex, engineered or created with a theorical or bioinformatic approach)
+    """ Each row describes a unique BMC-like complex.
+    
+    The table stores
+    
+    - complex ID,
+    - complex name,
+    - complex type (PDU, EUT...),
+    - complex source (native, engineered, predicted, theoretical),
+    - whether it is active,
+    - whether it has been experimentally tested.
     """
 
     __tablename__ = "complex"
-
-    # Define table content:
-    complex_id = Column(Integer, primary_key=True, autoincrement=True)
-    complex_name = Column(String, nullable=False)
-    complex_type = Column(
-        String, nullable=False
+    __table_args__ = (UniqueConstraint(
+        "complex_accession", "complex_type", "is_active", "is_exp_tested", # "complex_source"
+    ),) # To avoid duplicate entries, needs further thought
+    
+    # Define table content in Declarative:
+    complex_id: Mapped[int] = mapped_column(
+        primary_key=True, autoincrement=True
+    )  # Autopopulated ID for local table
+    complex_accession: Mapped[str] = mapped_column(nullable=False)
+    complex_type: Mapped[str] = mapped_column(
+        nullable=False
     )  # Classification undecided (pdu,eut,grm..)
-    is_active = Column(String)  # Active/Inactive. Boolean?
-    is_exp_tested = Column(String)  # Y/N. Boolean?
+    is_active: Mapped[Optional[bool]] = mapped_column(
+        nullable=True
+    )  # Active/Inactive.
+    is_exp_tested: Mapped[Optional[bool]] = mapped_column(
+        nullable=True
+    )  # Y/N.
     #    complex_source = Column(SQLEnum(ComplexSource, name="complex_source_enum"), nullable=False)  # Not currently defined
-
-    UniqueConstraint(
-        "complex_name", "complex_type", "is_active", "is_exp_tested", "complex_source"
-    )
 
     # Introduce all relationship between tables:
     proteins: Mapped["ProteinComplex"] = relationship(
@@ -414,8 +423,15 @@ class Complex(Base):
 
 
 class ProteinComplex(Base):
-    """Linker table, protein to complex cross-reference
-    This table will store the protein ID and the complex ID"""
+    """ Each row describes a unique protein-complex relationship.
+    
+    The table stores
+    
+    - protein ID,
+    - complex ID,
+    - whether the protein is essential for the complex assembly,
+    - copy number of the protein in the complex.
+    """
 
     __tablename__ = "protein_complex"
     __table_args__ = (PrimaryKeyConstraint("prot_id", "complex_id"),)
@@ -427,10 +443,13 @@ class ProteinComplex(Base):
     complex_id: Mapped[int] = mapped_column(
         ForeignKey("complex.complex_id"),
     )
-    is_essential = Column(Boolean, default=False, nullable=True)
-    # Whether the protein is essential for the complex assembly
-    copy_number = Column(Integer, nullable=True)
-    # Copy number of the protein in the complex
+    
+    is_essential: Mapped[Optional[bool]] = mapped_column(
+        default=False, nullable=True
+    )  # Whether the protein is essential for the complex assembly
+    copy_number: Mapped[Optional[int]] = mapped_column(
+        nullable=True
+    )  # Copy number of the protein in the complex
 
     # Introduce all relationship between tables:
     complex: Mapped["Complex"] = relationship(back_populates="proteins")
@@ -438,21 +457,30 @@ class ProteinComplex(Base):
 
 
 class Interaction(Base):
-    """Table representing the different interactions
-    between several proteins.
+    """ Each row describes a unique protein-protein interaction.
+    
+    The table stores
+    
+    - interaction ID,
+    - interaction type,
+    - interaction description.
     """
 
     __tablename__ = "interaction"
+    __table_args__ = (UniqueConstraint("interact_type", "interact_description"),)
 
-    # Define table content:
-    interact_id = Column(Integer, primary_key=True, autoincrement=True)
-    interact_type = Column(
-        String, nullable=False
+    # Define table content in declarative:
+    interact_id: Mapped[int] = mapped_column(
+        primary_key=True, autoincrement=True
+    )  # Autopopulated ID for local table
+    interact_type: Mapped[str] = mapped_column(
+        nullable=False
     )  # Type of interaction (e.g: electrostatic, hydrophobic, etc)
-    interact_description = Column(String)
-
-    UniqueConstraint(interact_type, interact_description)
-
+    
+    interact_description: Mapped[Optional[str]] = mapped_column(
+        nullable=True
+    ) # Description of the interaction
+    
     # Introduce all relationship between tables:
     interactions: Mapped["Prot_prot_interact"] = relationship(
         back_populates="interaction"
@@ -460,10 +488,13 @@ class Interaction(Base):
 
 
 class Prot_prot_interact(Base):
-    """Table representing the different specific interactions
-    between several proteins inside a complex and during assembly
-    This table will store the different proteins known to interact
-    specifically with each other.
+    """ Each row describes a unique protein-protein interaction between two  specific proteins.
+    
+    The table stores
+    
+    - interaction ID,
+    - protein ID 1,
+    - protein ID 2.
     """
 
     __tablename__ = "prot_prot_interact"
@@ -479,9 +510,6 @@ class Prot_prot_interact(Base):
     prot_id_2: Mapped[int] = mapped_column(
         ForeignKey("protein.prot_id"),
     )
-
-    # To enforce unique no repeated protein to protein interactions are created
-    UniqueConstraint("prot_id_1", "prot_id_2", "interaction_id")
 
     # Introduce all relationship between tables:
     protein_1: Mapped["Protein"] = relationship(back_populates="interaction_1")
