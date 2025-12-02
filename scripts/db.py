@@ -4,13 +4,23 @@
 followed and explanations needed kept to help following through
 the process."""
 
+#######################################################
+# (1) Imports
+#######################################################
+
 import logging  # We'll use this to report program state and other things to the user
 import sys
 
+from enum import (
+    Enum,
+)  # To create enumerations for some of the vocabulary restricted fields
 from pathlib import Path  # for type hints
+from typing import Optional
+
+from enums import DatabaseType, StructProtType, enum_from_str
 
 # Import  SQLAlchemy classes needed with a declarative approach.
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy import (
     Boolean,
     Column,
@@ -22,60 +32,60 @@ from sqlalchemy import (
     String,
     or_,
 )
-from sqlalchemy.orm import relationship, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, relationship, Mapped, mapped_column
+from sqlalchemy.orm import (
+    sessionmaker,
+)  # Import a sessionmaker to create a session object
+from sqlalchemy import (
+    create_engine,
+)  # Create_engine function to create an engine object
 
-# Import a sessionmaker to create a session object
-from sqlalchemy.orm import sessionmaker
-
-# Create_engine function to create an engine object
-from sqlalchemy import create_engine
-
-from typing import Optional
-
-# To create enumerations for some of the vocabulary restricted fields
-from enum import Enum
-
-# Database set up:
-
-# Create a base class to inherit from.
-Base = declarative_base()
-
-# Session set up:
-Session = sessionmaker()  # we also need a session object
+#######################################################
+# (2) Generic SQLAlchemy configuration
+#######################################################
 
 
-# Declare tables
+class Base(DeclarativeBase):
+    """Declarative base class"""
+
+    pass
+
+
+Session = sessionmaker()  # We also need a Session object for database connections
+
+
+#######################################################
+# (3) Define the database structure
+#######################################################
+
+
 class Protein(Base):
-    """Table representing a protein This table will store the protein sequence,
-    unique accession number, type of protein structure and whether is
-    canonical and isoform.
+    """Each row describes a unique protein.
+
+    The table stores
+
+    - protein sequence,
+    - unique accession ID
+    - type of protein structure
+    - canonical or isoform
     """
 
     __tablename__ = "protein"  # this is the name that will be used in SQLite
 
-    # Define table content:
-    prot_id = Column(Integer, primary_key=True, autoincrement=True)
-    prot_accession = Column(
-        Integer, nullable=False, unique=True
-    )  # Unique accession number for proteins ( I want to automate it, any suggestions on resources for this?)
-    prot_seq = Column(String, nullable=False, unique=True)
-    struct_prot_type = Column(
-        Integer, nullable=True
-    )  # BMC type H/T/P or non structural
-    is_canonical = Column(Boolean, default=True)  # Only false if it is an isoform
+    # Define Protein table columns using Declarative:
+    prot_id: Mapped[Optional[int]] = mapped_column(
+        primary_key=True, autoincrement=True
+    )  # Autopopulated ID for local table
+    prot_accession: Mapped[Optional[str]] = mapped_column(
+        nullable=False, unique=True
+    )  # A unique accession number, must be present
+    prot_seq: Mapped[Optional[str]] = mapped_column(nullable=False, unique=True)
+    is_canonical: Mapped[Optional[bool]] = mapped_column(
+        default=True
+    )  # True/False flag for whether this protein is canonical
+    #    struct_prot_type = Column(SQLEnum(StructProtType, name="struct_prot_type_enum"))  # Not currently defined
 
-    # Define type of output for protein
-    def __str__(self):
-        outstr = [
-            f"Protein ID: {self.prot_id}",
-            f"Protein accession: {self.prot_id}Protein sequence: {self.prot_seq}",
-            f"Protein structure type: {self.struct_prot_type}",
-            f"Protein is canonical: {self.is_canonical}",
-        ]
-        return "\n".join(outstr)
-
-    # Unsure if needed, but to keep the code consistent with the rest of the db
-    # Introduce all relationship between tables:
+    # Define relationships to other tables in Declarative
     references: Mapped["ProteinXref"] = relationship(back_populates="protein")
     cds: Mapped["Cds"] = relationship(back_populates="protein")
     names: Mapped["ProteinName"] = relationship(back_populates="protein")
@@ -89,41 +99,55 @@ class Protein(Base):
         back_populates="protein_2"
     )
 
+    # Define string representation of protein row
+    def __str__(self):
+        outstr = [
+            f"Protein ID: {self.prot_id}",
+            f"Protein accession: {self.prot_id}, Protein sequence: {self.prot_seq}",
+            f"Protein structure type: {self.struct_prot_type}",
+            f"Protein is canonical: {self.is_canonical}",
+        ]
+        return "\n".join(outstr)
+
 
 class Xdatabase(Base):
-    """Descriptions of external databases (linked by Xref accessions)"""
+    """Each row describes an external database"""
 
     __tablename__ = "xdatabase"
 
-    # Define table content:
-    xref_db_id = Column(Integer, primary_key=True)
-    xref_db_name = Column(String, nullable=False, unique=True)
-    xref_href = Column(String, nullable=False, unique=True)  # URL for database access
-    xref_type = Column(
-        String, nullable=False
-    )  # types of database: seq, struct, funct, tax'
+    # Define database row using Declarative
+    xref_db_id: Mapped[int] = mapped_column(
+        primary_key=True, autoincrement=True
+    )  # Local id for database
+    xref_db_name: Mapped[str] = mapped_column(
+        nullable=False, unique=True
+    )  # Database with crossref
+    xref_href: Mapped[str] = mapped_column(
+        nullable=False, unique=True
+    )  # URL to database
+    #    xref_type = Column(SQLEnum(DatabaseType, name ="database_type_enum", nullable=False))   # Not currently defined
 
-    # Introduce all relationship between tables:
+    # Define relationships using Declarative
     xref: Mapped["Xref"] = relationship(back_populates="xref_db_id")
     databases: Mapped[list["Xref"]] = relationship()
 
 
 class Xref(Base):  # All external references
-    """Table representing a singe database cross-reference"""
+    """Each row describes an external database cross-reference"""
 
     __tablename__ = "xref"
 
     # Define table content:
-    xref_id = Column(Integer, primary_key=True, autoincrement=True)
-    xref_acc_ext = Column(
-        String, unique=True, nullable=False
-    )  # Accession from external db
+    xref_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    xref_acc_ext: Mapped[str] = mapped_column(
+        nullable=False, unique=True
+    )  # External DB accession
     xref_db_id: Mapped[int] = mapped_column(
         ForeignKey("xdatabase.xref_db_id"),
         nullable=False,
     )
 
-    # Introduce all relationships between tables
+    # Define relationships using Declarative
     xref_db: Mapped["Xdatabase"] = relationship(back_populates="databases")
     proteins: Mapped["ProteinXref"] = relationship(back_populates="xref")
     cdss: Mapped["CdsXref"] = relationship(back_populates="cds")
@@ -133,8 +157,7 @@ class ProteinXref(Base):
     """Linker table, protein to database cross-reference"""
 
     __tablename__ = "protein_xref"
-    # For linker tables, we need to set a PrimaryKeyConstraint,
-    # so SQLite knows what the primary key is for the table
+    # Require a unique combination of protein ID and crossreference ID
     __table_args__ = (PrimaryKeyConstraint("prot_id", "xref_id"),)
 
     prot_id: Mapped[int] = mapped_column(
@@ -144,27 +167,35 @@ class ProteinXref(Base):
         ForeignKey("xref.xref_id"),
     )
 
-    # Introduce all relationship between tables:
+    # Define relationships using Declarative
     protein: Mapped["Protein"] = relationship(back_populates="references")
     xref: Mapped["Xref"] = relationship(back_populates="proteins")
 
 
 class Cds(Base):
-    """Table representing the gene details linked to a protein
-    This table will store the gene ID, DNA sequence,
-    origin sequences if engineered, accession number and the corresponding
-    protein
+    """ Each row describes a unique CDS.
+    
+    The table stores
+    
+    - gene ID,
+    - DNA sequence,
+    - origin sequences if engineered,
+    - accession number
+    - and the corresponding protein.
     """
 
     __tablename__ = "cds"
 
-    # Define table content:
-    cds_id = Column(Integer, primary_key=True)
-    cds_seq = Column(String, nullable=False, unique=True)
-    cds_accession = Column(
-        String, nullable=False, unique=True
-    )  # Unique accession number for CDS
-
+    # Define table content  using declarative:
+    cds_id: Mapped[int] = mapped_column(
+        primary_key=True, autoincrement=True
+    )  # Autopopulated ID for local table
+    cds_seq: Mapped[str] = mapped_column(
+        nullable=False, unique=True
+    )  # Gene DNA sequence
+    cds_accession: Mapped[str] = mapped_column(
+        nullable=False, unique=True
+    )  # Unique accession number for CD
     prot_id: Mapped[int] = mapped_column(ForeignKey("protein.prot_id"), nullable=False)
 
     # Introduce all relationship between tables: Check this?
@@ -176,19 +207,21 @@ class Cds(Base):
 
 
 class Origin(Base):
-    """Table representing the original DNA sequence of a modified CDS
-    This table will store the original DNA sequence and the corresponding
-    modified CDS sequence id
+    """ Each row describes the link between original and modified CDS.
+    
+    The table stores
+    
+    - original DNA sequence id,
+    - the corresponding modified CDS id.
     """
 
     __tablename__ = "origin"
     __table_args__ = (PrimaryKeyConstraint("origin_id", "cds_id"),)
 
     # Define table content:
-    # Should I change names here?
     origin_id: Mapped[int] = mapped_column(
         ForeignKey("cds.cds_id"), nullable=False
-    )  # Original CDS sequence (cds_id key)
+    )  # Foreign key, original CDS sequence (cds_id key)
     cds_id: Mapped[int] = mapped_column(
         ForeignKey("cds.cds_id"), nullable=False
     )  # Foreign key, modified CDS sequence (cds_id key)
@@ -218,18 +251,26 @@ class CdsXref(Base):
 
 
 class Modification(Base):
-    """Table representing the modification of the engineered CDS sequences
-    This modifications will be vocabulary restricted:
-    truncated, fusion, synthetic, mutated, domesticated"""
+    """ Each row represents a unique modification applied to a CDS.
+    
+    
+    The table stores
+    
+    - modification ID,
+    - modification type (enum): truncated, extended, fusion, synthetic, mutated, domesticated,
+    - description of the modification.
+    """
 
     __tablename__ = "modification"
+    # __table_args__ = (UniqueConstraint("modification_description", "modification_type"),)
 
-    # Define table content:
-    modification_id = Column(Integer, primary_key=True, autoincrement=True)
-    modification_type = Column(String, nullable=False)  # vocabulary restricted
-    modification_description = Column(String, nullable=False)
-
-    UniqueConstraint(modification_type, modification_description)
+    # Define table content using declarative:
+    modification_id: Mapped[int] = mapped_column(
+        primary_key=True, autoincrement=True
+    )  # Autopopulated ID for local table
+    modification_description: Mapped[str] = mapped_column(nullable=False)
+        
+    #    modification_type = Column(SQLEnum(ModificationType, name="modification_type_enum"), nullable=False)   # Not currently defined
 
     # Introduce all relationship between tables:
     modifications: Mapped["CdsModification"] = relationship(
@@ -238,7 +279,13 @@ class Modification(Base):
 
 
 class CdsModification(Base):
-    """Linker table, CDS to modification cross-reference"""
+    """ Each row represents a unique modification applied to a CDS.
+    
+    The table stores
+    
+    - modification ID,
+    - CDS ID.
+    """
 
     __tablename__ = "cds_modification"
     __table_args__ = (PrimaryKeyConstraint("cds_id", "modification_id"),)
@@ -255,26 +302,38 @@ class CdsModification(Base):
 
 
 class Name(Base):
-    """Table representing a protein name
-    Each name_ID represents a protein name. Several name strings
-    given to an unique protein, and several proteins sharing same name
+    """ Each row describes a protein name.
+    
+    The table stores
+    
+    - name ID,
+    - protein name.
+    
+
     """
 
     __tablename__ = "name"
 
-    # Define table content:
-    name_id = Column(
-        Integer, primary_key=True, autoincrement=True
+    # Define table content in Declarative:
+    name_id: Mapped[int] = mapped_column(
+        primary_key=True, autoincrement=True
     )  # primary key column
-    prot_name = Column(String, nullable=False)
+    prot_name: Mapped[str] = mapped_column(nullable=False)
 
     # Introduce all relationship between tables:
     proteins: Mapped[list["ProteinName"]] = relationship(back_populates="name")
 
 
 class ProteinName(Base):
-    """Linker table, protein to name cross-reference
-    This table will store the protein ID and the name ID"""
+    """ Each row describes a protein name associated to a protein.
+    
+    The table stores
+    
+    - protein ID,
+    - name ID.
+    Several proteins can share the same name
+    A name can be shared by several proteins
+    """
 
     __tablename__ = "protein_name"
     __table_args__ = (PrimaryKeyConstraint("prot_id", "name_id"),)
@@ -293,10 +352,15 @@ class ProteinName(Base):
 
 
 class Isoforms(Base):
-    """Table representing the isoforms of a protein
-    This table will store the canonical protein ID and the isoform protein ID.
-    The canonical protein ID is the one that is considered the main protein,
-    while the isoform protein ID is a variant of the canonical protein.
+    """ Each row describes a protein isoform relationship with its canonical protein.
+    
+    The table stores
+    
+    - canonical protein ID,
+    - isoform protein ID.
+    
+    Several isoforms can be associated to a canonical protein.
+    An isoform can only be associated to one canonical protein.
     """
 
     __tablename__ = "isoforms"
@@ -316,30 +380,38 @@ class Isoforms(Base):
 
 
 class Complex(Base):
-    """Table representing the complex that can be form by the interaction
-    between several proteins, including native BMC or engineered ones
-    This table will store the complex features, including the type (e.g: pdu, eut),
-    whether is has enzymatic activty or not, if it has been experimentally tested
-    whether it assembles or not, the origin of the complex in a restricted vocabulary (meaning whether is it
-    a native complex, engineered or created with a theorical or bioinformatic approach)
+    """ Each row describes a unique BMC-like complex.
+    
+    The table stores
+    
+    - complex ID,
+    - complex name,
+    - complex type (PDU, EUT...),
+    - complex source (native, engineered, predicted, theoretical),
+    - whether it is active,
+    - whether it has been experimentally tested.
     """
 
     __tablename__ = "complex"
-
-    # Define table content:
-    complex_id = Column(Integer, primary_key=True, autoincrement=True)
-    complex_name = Column(String, nullable=False)
-    complex_type = Column(
-        String, nullable=False
+    __table_args__ = (UniqueConstraint(
+        "complex_accession", "complex_type", "is_active", "is_exp_tested", # "complex_source"
+    ),) # To avoid duplicate entries, needs further thought
+    
+    # Define table content in Declarative:
+    complex_id: Mapped[int] = mapped_column(
+        primary_key=True, autoincrement=True
+    )  # Autopopulated ID for local table
+    complex_accession: Mapped[str] = mapped_column(nullable=False)
+    complex_type: Mapped[str] = mapped_column(
+        nullable=False
     )  # Classification undecided (pdu,eut,grm..)
-    is_active = Column(String)  # Active/Inactive. Boolean?
-    is_exp_tested = Column(String)  # Y/N. Boolean?
-    complex_source = Column(String, nullable=False)
-    # Native/engineered/theoretical...
-
-    UniqueConstraint(
-        "complex_name", "complex_type", "is_active", "is_exp_tested", "complex_source"
-    )
+    is_active: Mapped[Optional[bool]] = mapped_column(
+        nullable=True
+    )  # Active/Inactive.
+    is_exp_tested: Mapped[Optional[bool]] = mapped_column(
+        nullable=True
+    )  # Y/N.
+    #    complex_source = Column(SQLEnum(ComplexSource, name="complex_source_enum"), nullable=False)  # Not currently defined
 
     # Introduce all relationship between tables:
     proteins: Mapped["ProteinComplex"] = relationship(
@@ -351,8 +423,15 @@ class Complex(Base):
 
 
 class ProteinComplex(Base):
-    """Linker table, protein to complex cross-reference
-    This table will store the protein ID and the complex ID"""
+    """ Each row describes a unique protein-complex relationship.
+    
+    The table stores
+    
+    - protein ID,
+    - complex ID,
+    - whether the protein is essential for the complex assembly,
+    - copy number of the protein in the complex.
+    """
 
     __tablename__ = "protein_complex"
     __table_args__ = (PrimaryKeyConstraint("prot_id", "complex_id"),)
@@ -364,10 +443,13 @@ class ProteinComplex(Base):
     complex_id: Mapped[int] = mapped_column(
         ForeignKey("complex.complex_id"),
     )
-    is_essential = Column(Boolean, default=False, nullable=True)
-    # Whether the protein is essential for the complex assembly
-    copy_number = Column(Integer, nullable=True)
-    # Copy number of the protein in the complex
+    
+    is_essential: Mapped[Optional[bool]] = mapped_column(
+        default=False, nullable=True
+    )  # Whether the protein is essential for the complex assembly
+    copy_number: Mapped[Optional[int]] = mapped_column(
+        nullable=True
+    )  # Copy number of the protein in the complex
 
     # Introduce all relationship between tables:
     complex: Mapped["Complex"] = relationship(back_populates="proteins")
@@ -375,21 +457,30 @@ class ProteinComplex(Base):
 
 
 class Interaction(Base):
-    """Table representing the different interactions
-    between several proteins.
+    """ Each row describes a unique protein-protein interaction.
+    
+    The table stores
+    
+    - interaction ID,
+    - interaction type,
+    - interaction description.
     """
 
     __tablename__ = "interaction"
+    __table_args__ = (UniqueConstraint("interact_type", "interact_description"),)
 
-    # Define table content:
-    interact_id = Column(Integer, primary_key=True, autoincrement=True)
-    interact_type = Column(
-        String, nullable=False
+    # Define table content in declarative:
+    interact_id: Mapped[int] = mapped_column(
+        primary_key=True, autoincrement=True
+    )  # Autopopulated ID for local table
+    interact_type: Mapped[str] = mapped_column(
+        nullable=False
     )  # Type of interaction (e.g: electrostatic, hydrophobic, etc)
-    interact_description = Column(String)
-
-    UniqueConstraint(interact_type, interact_description)
-
+    
+    interact_description: Mapped[Optional[str]] = mapped_column(
+        nullable=True
+    ) # Description of the interaction
+    
     # Introduce all relationship between tables:
     interactions: Mapped["Prot_prot_interact"] = relationship(
         back_populates="interaction"
@@ -397,10 +488,13 @@ class Interaction(Base):
 
 
 class Prot_prot_interact(Base):
-    """Table representing the different specific interactions
-    between several proteins inside a complex and during assembly
-    This table will store the different proteins known to interact
-    specifically with each other.
+    """ Each row describes a unique protein-protein interaction between two  specific proteins.
+    
+    The table stores
+    
+    - interaction ID,
+    - protein ID 1,
+    - protein ID 2.
     """
 
     __tablename__ = "prot_prot_interact"
@@ -416,9 +510,6 @@ class Prot_prot_interact(Base):
     prot_id_2: Mapped[int] = mapped_column(
         ForeignKey("protein.prot_id"),
     )
-
-    # To enforce unique no repeated protein to protein interactions are created
-    UniqueConstraint("prot_id_1", "prot_id_2", "interaction_id")
 
     # Introduce all relationship between tables:
     protein_1: Mapped["Protein"] = relationship(back_populates="interaction_1")
@@ -457,6 +548,15 @@ class Prot_prot_interact(Base):
 #     print(
 #         f"Before query, {protseq[:10]=}..., {protaccession=}, {struct=}, {canonical=}"
 #     )
+
+# Check and convert xtype
+# if isinstance(xtype, str):
+#     try:
+#         xtype = enum_from_str(StructProtType, xtype)
+#     except ValueError as e:
+#         print(f"Invalid protein type: {xtype!r} — {e}")
+#         return None
+
 #     # Create a new protein object
 #     protein = (
 #         session.query(Protein)
@@ -508,6 +608,19 @@ class Prot_prot_interact(Base):
 
 #     print(f"\nNow in {xdatabase_addition.__name__}")
 #     print(f"Before query, {xname=}, {href=}, {xtype=}")
+
+# Check and convert xtype
+# if isinstance(xtype, str):
+#     try:
+#         xtype = enum_from_str(DatabaseType, xtype)
+#     except ValueError as e:
+#         print(f"Invalid database type: {xtype!r} — {e}")
+#         return None
+
+# elif not isinstance(xtype, DatabaseType):
+#     print(f"xtype must be a string or DatabaseType, got {type(xtype)}")
+#     return None
+# print(f"Converted xtype to Enum: {xtype}")
 
 #     # Create a new db object
 #     xdb = (
@@ -719,6 +832,11 @@ class Prot_prot_interact(Base):
 
 #         return name  # Return the gene row we just added to the db/otherwise dealt with
 
+#######################################################
+# (4) Helper functions that use the definitions to
+#     construct or interact with the database
+#######################################################
+
 
 # Function to create the database and tables
 def create_db(dbpath: Path):
@@ -743,6 +861,11 @@ def get_session(dbpath: Path):
     return Session()
 
 
+#######################################################
+# (5) Code that runs when this file is called as
+#     a script
+#######################################################
+
 if __name__ == "__main__":
     # Set up logging
     logger = logging.getLogger()
@@ -758,9 +881,13 @@ if __name__ == "__main__":
     outdbpath = Path("db.sqlite3")
 
     # Create database
-    logger.info("Creating and populating database at %s", outdbpath)
+    logger.info("Creating database at %s", outdbpath)
     create_db(outdbpath)
 
+    # Render database as an ER diagram
+    from eralchemy import render_er
+
+    render_er(Base, "er_diagram.pdf")
 
 ## How to populate parent child relationships for CDS
 # Suppose we have CDS with the following relationships
