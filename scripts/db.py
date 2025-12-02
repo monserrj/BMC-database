@@ -173,10 +173,10 @@ class ProteinXref(Base):
 
 
 class Cds(Base):
-    """ Each row describes a unique CDS.
-    
+    """Each row describes a unique CDS.
+
     The table stores
-    
+
     - gene ID,
     - DNA sequence,
     - origin sequences if engineered,
@@ -207,10 +207,10 @@ class Cds(Base):
 
 
 class Origin(Base):
-    """ Each row describes the link between original and modified CDS.
-    
+    """Each row describes the link between original and modified CDS.
+
     The table stores
-    
+
     - original DNA sequence id,
     - the corresponding modified CDS id.
     """
@@ -251,11 +251,11 @@ class CdsXref(Base):
 
 
 class Modification(Base):
-    """ Each row represents a unique modification applied to a CDS.
-    
-    
+    """Each row represents a unique modification applied to a CDS.
+
+
     The table stores
-    
+
     - modification ID,
     - modification type (enum): truncated, extended, fusion, synthetic, mutated, domesticated,
     - description of the modification.
@@ -269,7 +269,7 @@ class Modification(Base):
         primary_key=True, autoincrement=True
     )  # Autopopulated ID for local table
     modification_description: Mapped[str] = mapped_column(nullable=False)
-        
+
     #    modification_type = Column(SQLEnum(ModificationType, name="modification_type_enum"), nullable=False)   # Not currently defined
 
     # Introduce all relationship between tables:
@@ -279,10 +279,10 @@ class Modification(Base):
 
 
 class CdsModification(Base):
-    """ Each row represents a unique modification applied to a CDS.
-    
+    """Each row represents a unique modification applied to a CDS.
+
     The table stores
-    
+
     - modification ID,
     - CDS ID.
     """
@@ -302,13 +302,13 @@ class CdsModification(Base):
 
 
 class Name(Base):
-    """ Each row describes a protein name.
-    
+    """Each row describes a protein name.
+
     The table stores
-    
+
     - name ID,
     - protein name.
-    
+
 
     """
 
@@ -325,10 +325,10 @@ class Name(Base):
 
 
 class ProteinName(Base):
-    """ Each row describes a protein name associated to a protein.
-    
+    """Each row describes a protein name associated to a protein.
+
     The table stores
-    
+
     - protein ID,
     - name ID.
     Several proteins can share the same name
@@ -352,13 +352,13 @@ class ProteinName(Base):
 
 
 class Isoforms(Base):
-    """ Each row describes a protein isoform relationship with its canonical protein.
-    
+    """Each row describes a protein isoform relationship with its canonical protein.
+
     The table stores
-    
+
     - canonical protein ID,
     - isoform protein ID.
-    
+
     Several isoforms can be associated to a canonical protein.
     An isoform can only be associated to one canonical protein.
     """
@@ -380,10 +380,10 @@ class Isoforms(Base):
 
 
 class Complex(Base):
-    """ Each row describes a unique BMC-like complex.
-    
+    """Each row describes a unique BMC-like complex.
+
     The table stores
-    
+
     - complex ID,
     - complex name,
     - complex type (PDU, EUT...),
@@ -393,10 +393,15 @@ class Complex(Base):
     """
 
     __tablename__ = "complex"
-    __table_args__ = (UniqueConstraint(
-        "complex_accession", "complex_type", "is_active", "is_exp_tested", # "complex_source"
-    ),) # To avoid duplicate entries, needs further thought
-    
+    __table_args__ = (
+        UniqueConstraint(
+            "complex_accession",
+            "complex_type",
+            "is_active",
+            "is_exp_tested",  # "complex_source"
+        ),
+    )  # To avoid duplicate entries, needs further thought
+
     # Define table content in Declarative:
     complex_id: Mapped[int] = mapped_column(
         primary_key=True, autoincrement=True
@@ -405,12 +410,8 @@ class Complex(Base):
     complex_type: Mapped[str] = mapped_column(
         nullable=False
     )  # Classification undecided (pdu,eut,grm..)
-    is_active: Mapped[Optional[bool]] = mapped_column(
-        nullable=True
-    )  # Active/Inactive.
-    is_exp_tested: Mapped[Optional[bool]] = mapped_column(
-        nullable=True
-    )  # Y/N.
+    is_active: Mapped[Optional[bool]] = mapped_column(nullable=True)  # Active/Inactive.
+    is_exp_tested: Mapped[Optional[bool]] = mapped_column(nullable=True)  # Y/N.
     #    complex_source = Column(SQLEnum(ComplexSource, name="complex_source_enum"), nullable=False)  # Not currently defined
 
     # Introduce all relationship between tables:
@@ -423,10 +424,10 @@ class Complex(Base):
 
 
 class ProteinComplex(Base):
-    """ Each row describes a unique protein-complex relationship.
-    
+    """Each row describes a unique protein-complex relationship.
+
     The table stores
-    
+
     - protein ID,
     - complex ID,
     - whether the protein is essential for the complex assembly,
@@ -443,7 +444,7 @@ class ProteinComplex(Base):
     complex_id: Mapped[int] = mapped_column(
         ForeignKey("complex.complex_id"),
     )
-    
+
     is_essential: Mapped[Optional[bool]] = mapped_column(
         default=False, nullable=True
     )  # Whether the protein is essential for the complex assembly
@@ -457,10 +458,10 @@ class ProteinComplex(Base):
 
 
 class Interaction(Base):
-    """ Each row describes a unique protein-protein interaction.
-    
+    """Each row describes a unique protein-protein interaction.
+
     The table stores
-    
+
     - interaction ID,
     - interaction type,
     - interaction description.
@@ -476,11 +477,11 @@ class Interaction(Base):
     interact_type: Mapped[str] = mapped_column(
         nullable=False
     )  # Type of interaction (e.g: electrostatic, hydrophobic, etc)
-    
+
     interact_description: Mapped[Optional[str]] = mapped_column(
         nullable=True
-    ) # Description of the interaction
-    
+    )  # Description of the interaction
+
     # Introduce all relationship between tables:
     interactions: Mapped["Prot_prot_interact"] = relationship(
         back_populates="interaction"
@@ -488,10 +489,10 @@ class Interaction(Base):
 
 
 class Prot_prot_interact(Base):
-    """ Each row describes a unique protein-protein interaction between two  specific proteins.
-    
+    """Each row describes a unique protein-protein interaction between two  specific proteins.
+
     The table stores
-    
+
     - interaction ID,
     - protein ID 1,
     - protein ID 2.
@@ -866,10 +867,13 @@ def get_session(dbpath: Path):
 #     a script
 #######################################################
 
+
 if __name__ == "__main__":
     # Set up logging
     logger = logging.getLogger()
-    logformatter = logging.Formatter("[%(levelname)s] %(asctime)s %(message)s")
+    logformatter = logging.Formatter(
+        "[%(levelname)s] %(funcName)s %(asctime)s %(message)s"
+    )
     logger.setLevel(logging.DEBUG)
 
     # Add a handler that writes to the console
@@ -877,12 +881,15 @@ if __name__ == "__main__":
     termhandler.setFormatter(logformatter)
     logger.addHandler(termhandler)
 
+    logger.debug("I'm doing something - 1")
+
     # Path to output database
     outdbpath = Path("db.sqlite3")
 
     # Create database
     logger.info("Creating database at %s", outdbpath)
     create_db(outdbpath)
+    logger.info("Created database at %s", outdbpath)
 
     # Render database as an ER diagram
     from eralchemy import render_er
