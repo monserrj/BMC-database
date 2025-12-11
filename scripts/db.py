@@ -73,7 +73,7 @@ class Protein(Base):
     __tablename__ = "protein"  # this is the name that will be used in SQLite
 
     # Define Protein table columns using Declarative:
-    prot_id: Mapped[[int] = mapped_column(
+    prot_id: Mapped[int] = mapped_column(
         primary_key=True, autoincrement=True
     )  # Autopopulated ID for local table
     prot_accession: Mapped[str] = mapped_column(
@@ -493,7 +493,7 @@ class Ppi(Base):
     
     # Define table content:
     ppi_id: Mapped[int] = mapped_column(primary_key=True, unique=True, autoincrement=True)
-    interact_id: Mapped[optional[int]] = mapped_column(
+    interact_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("interaction.interact_id"),
     )
     prot_id_1: Mapped[int] = mapped_column(
