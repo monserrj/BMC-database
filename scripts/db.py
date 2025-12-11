@@ -92,10 +92,10 @@ class Protein(Base):
     isoforms: Mapped["Isoforms"] = relationship(back_populates="isoform")
     canonicals: Mapped["Isoforms"] = relationship(back_populates="canonical")
     complexes: Mapped["ProteinComplex"] = relationship(back_populates="protein")
-    interaction_1: Mapped["Prot_prot_interact"] = relationship(
+    interaction_1: Mapped["Ppi"] = relationship(
         back_populates="protein_1"
     )
-    interaction_2: Mapped["Prot_prot_interact"] = relationship(
+    interaction_2: Mapped["Ppi"] = relationship(
         back_populates="protein_2"
     )
 
@@ -393,20 +393,12 @@ class Complex(Base):
     """
 
     __tablename__ = "complex"
-    __table_args__ = (
-        UniqueConstraint(
-            "complex_accession",
-            "complex_type",
-            "is_active",
-            "is_exp_tested",  # "complex_source"
-        ),
-    )  # To avoid duplicate entries, needs further thought
 
     # Define table content in Declarative:
     complex_id: Mapped[int] = mapped_column(
         primary_key=True, autoincrement=True
     )  # Autopopulated ID for local table
-    complex_accession: Mapped[str] = mapped_column(nullable=False)
+    complex_accession: Mapped[str] = mapped_column(nullable=False, unique=True)
     complex_type: Mapped[str] = mapped_column(
         nullable=False
     )  # Classification undecided (pdu,eut,grm..)
@@ -448,7 +440,7 @@ class ProteinComplex(Base):
     is_essential: Mapped[Optional[bool]] = mapped_column(
         default=False, nullable=True
     )  # Whether the protein is essential for the complex assembly
-    copy_number: Mapped[Optional[int]] = mapped_column(
+    stoichiometry: Mapped[Optional[int]] = mapped_column(
         nullable=True
     )  # Copy number of the protein in the complex
 
@@ -483,25 +475,24 @@ class Interaction(Base):
     )  # Description of the interaction
 
     # Introduce all relationship between tables:
-    interactions: Mapped["Prot_prot_interact"] = relationship(
-        back_populates="interaction"
-    )
+    ppis: Mapped["Ppi"] = relationship(back_populates="interaction")
 
 
-class Prot_prot_interact(Base):
+class Ppi(Base):
     """Each row describes a unique protein-protein interaction between two  specific proteins.
 
     The table stores
 
+    - ppiID (to assign a unique identifier to each interaction),
     - interaction ID,
     - protein ID 1,
     - protein ID 2.
     """
 
-    __tablename__ = "prot_prot_interact"
-    __table_args__ = (PrimaryKeyConstraint("interact_id", "prot_id_1", "prot_id_2"),)
-
+    __tablename__ = "Ppi"
+    
     # Define table content:
+    ppi_id: Mapped[int] = mapped_column(primary_key=True, unique=True, autoincrement=True)
     interact_id: Mapped[int] = mapped_column(
         ForeignKey("interaction.interact_id"),
     )
@@ -513,11 +504,34 @@ class Prot_prot_interact(Base):
     )
 
     # Introduce all relationship between tables:
+    interaction: Mapped["Ppi_complex"] = relationship(back_populates="ppis")
     protein_1: Mapped["Protein"] = relationship(back_populates="interaction_1")
     protein_2: Mapped["Protein"] = relationship(back_populates="interaction_2")
     interaction: Mapped["Interaction"] = relationship(back_populates="interactions")
 
+class Ppi_complex(Base):
+    """Each row describes a unique protein-protein interaction associated to a complex.
 
+    The table stores
+
+    - ppiID,
+    - complex ID.
+    """
+
+    __tablename__ = "ppi_complex"
+    __table_args__ = (PrimaryKeyConstraint("ppi_id", "complex_id"),)
+
+    # Define table content:
+    ppi_id: Mapped[int] = mapped_column(
+        ForeignKey("Ppi.ppi_id"),
+    )
+    complex_id: Mapped[int] = mapped_column(
+        ForeignKey("complex.complex_id"),
+    )
+
+    # Introduce all relationship between tables:
+    ppi: Mapped["Ppi"] = relationship(back_populates="ppis")
+    complex: Mapped["Complex"] = relationship(back_populates="proteins")
 """ Functions to add data to the database"""
 
 # # Function for protein data addition
