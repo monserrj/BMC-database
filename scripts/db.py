@@ -1,604 +1,916 @@
 #!/usr/bin/env python
 
-# This script is the development of the BMC db. Instructions
-# followed and explanations needed kept to help following through
+"""This script is the development of the BMC db. Instructions
+followed and explanations needed kept to help following through
+the process."""
+
+#######################################################
+# (1) Imports
+#######################################################
+
+import logging  # We'll use this to report program state and other things to the user
+import sys
+
+from enum import (
+    Enum,
+)  # To create enumerations for some of the vocabulary restricted fields
 from pathlib import Path  # for type hints
+from typing import Optional
+
+from enums import DatabaseType, StructProtType, enum_from_str
 
 # Import  SQLAlchemy classes needed with a declarative approach.
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy import (
+    Boolean,
     Column,
     Integer,
     String,
     ForeignKey,
+    PrimaryKeyConstraint,
     UniqueConstraint,
     String,
+    or_,
 )
-from sqlalchemy.orm import relationship, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, relationship, Mapped, mapped_column
+from sqlalchemy.orm import (
+    sessionmaker,
+)  # Import a sessionmaker to create a session object
+from sqlalchemy import (
+    create_engine,
+)  # Create_engine function to create an engine object
 
-# Import a sessionmaker to create a session object
-from sqlalchemy.orm import sessionmaker
-
-# Create_engine function to create an engine object
-from sqlalchemy import create_engine
-
-from typing import Optional
-
-# Database set up:
-
-# Create a base class to inherit from.
-Base = declarative_base()
-
-# Session set up:
-Session = sessionmaker()  # we also need a session object
-# Session.configure(bind=engine)
-# session = Session()
-
-# Database creation:
+#######################################################
+# (2) Generic SQLAlchemy configuration
+#######################################################
 
 
-# Create the tables in the database.
-# Tables with one-to-many and many-to-many relationships must be created
-# before creating other tables, to satisfy the logic of the code.
-class ProteinName(Base):
-    __tablename__ = "protein_name"
-    prot_id: Mapped[int] = mapped_column(
-        ForeignKey("protein.prot_id"), primary_key=True
-    )
-    name_id: Mapped[int] = mapped_column(
-        ForeignKey("name.name_id"), primary_key=True
-    )  # Not primary key as can be repeated
-    name_rank: Mapped[Optional[int]]
-    name: Mapped["Name"] = relationship(back_populates="proteins")
-    protein: Mapped["Protein"] = relationship(back_populates="names")
-    # UniqueConstraint("prot_id", "name_id", "name_rank")
+class Base(DeclarativeBase):
+    """Declarative base class"""
+
+    pass
 
 
-class ProteinTaxonomy(Base):
-    __tablename__ = "protein_taxonomy"
-    prot_id: Mapped[int] = mapped_column(
-        ForeignKey("protein.prot_id"), primary_key=True
-    )
-    tax_id: Mapped[int] = mapped_column(ForeignKey("taxonomy.tax_id"), primary_key=True)
-    taxonomy: Mapped["Taxonomy"] = relationship(back_populates="proteins")
-    protein: Mapped["Protein"] = relationship(back_populates="taxonomies")
-    # UniqueConstraint("prot_id", "tax_id")
+Session = sessionmaker()  # We also need a Session object for database connections
 
 
-class ProteinPdb(Base):
-    __tablename__ = "protein_pdb"
-    prot_id: Mapped[int] = mapped_column(
-        ForeignKey("protein.prot_id"), primary_key=True
-    )
-    pdb_id: Mapped[int] = mapped_column(
-        ForeignKey("pdb.pdb_id")
-    )  # Recheck if this is primary key too
-    pdb: Mapped["Pdb"] = relationship(back_populates="proteins")
-    protein: Mapped["Protein"] = relationship(back_populates="pdbs")
-    UniqueConstraint("prot_id", "pdb_id")
+#######################################################
+# (3) Define the database structure
+#######################################################
 
 
-class ProteinDomain(Base):
-    __tablename__ = "protein_domain"
-    prot_id: Mapped[int] = mapped_column(
-        ForeignKey("protein.prot_id"), primary_key=True
-    )
-    dom_id: Mapped[int] = mapped_column(ForeignKey("domain.dom_id"))
-    domain: Mapped["Domain"] = relationship(back_populates="proteins")
-    protein: Mapped["Protein"] = relationship(back_populates="domains")
-    UniqueConstraint("prot_id", "dom_id")
-
-
-# class Isoforms (Base):
-#     __tablename__ = "isoforms"
-#     canonical__prot_id : Mapped[int] = mapped_column(ForeignKey("protein.prot_id"), primary_key=True)
-#     isoform__prot_id : Mapped[int] = mapped_column(ForeignKey("protein.prot_id"), primary_key=True)
-#     isoform : Mapped["Protein"] = relationship(back_populates="isoforms")
-#     canonical: Mapped["Protein"] = relationship(back_populates="canonicals") # Recheck this
-
-
-class ProteinFunction(Base):
-    __tablename__ = "protein_function"
-    prot_id: Mapped[int] = mapped_column(
-        ForeignKey("protein.prot_id"), primary_key=True
-    )
-    go_id: Mapped[int] = mapped_column(ForeignKey("function.go_id"))
-    function: Mapped["Function"] = relationship(back_populates="proteins")
-    UniqueConstraint("prot_id", "go_id")
-
-
-class ProteinPath(Base):
-    __tablename__ = "protein_path"
-    prot_id: Mapped[int] = mapped_column(
-        ForeignKey("protein.prot_id"), primary_key=True
-    )
-    path_id: Mapped[int] = mapped_column(ForeignKey("enzyme_path.path_id"))
-    path: Mapped["EnzymePath"] = relationship(back_populates="proteins")
-    protein: Mapped["Protein"] = relationship(back_populates="paths")
-    UniqueConstraint("prot_id", "path_id")
-
-
-# proteincomplex = Table(
-#      "protein_complex",
-#      Base.metadata,
-#     Column("prot_id", Integer, ForeignKey("protein.prot_id")),
-#     Column("complex_id", Integer, ForeignKey("complex.complex_id")),
-#     Column("prot_essential_assembly", Integer),
-#     Column("ppi_ID", Integer, ForeignKey("protein.prot_id")),
-#     Column("copy_number", Integer),
-# )
-
-
-# Create a class corresponding to each database table. No classes
-# are instantiated until we create an instance of the Base class -
-# this gets done after the tables are created.
-# Each class inherits from the Base class we created earlier.
 class Protein(Base):
-    """Table representing a protein This table will store the protein sequence, links to accessions
-    in other databases, and links to the type of protein structure.
-    The protein sequence is taken to be unique, so we'll add a
-    UniqueConstraint to the table to enforce this.
+    """Each row describes a unique protein.
+
+    The table stores
+
+    - protein sequence,
+    - unique accession ID
+    - type of protein structure
+    - canonical or isoform
     """
 
     __tablename__ = "protein"  # this is the name that will be used in SQLite
-    # Introduce all relationship between tables:
-    names: Mapped[list["ProteinName"]] = relationship()
-    taxonomies: Mapped[list["ProteinTaxonomy"]] = relationship()
-    pdbs: Mapped[list["ProteinPdb"]] = relationship()
-    domains: Mapped[list["ProteinDomain"]] = relationship()
-    # isoforms: Mapped[list["Isoforms"]] = relationship()
-    # canonicals: Mapped[list["Isoforms"]] = relationship() # I am sure this is wrong, fix when TS
-    functions: Mapped[list["ProteinFunction"]] = relationship()
-    paths: Mapped[list["ProteinPath"]] = relationship()
-    # Define table content:
-    prot_id = Column(Integer, primary_key=True, autoincrement=True)
-    prot_seq = Column(String, nullable=False, unique=True)
-    locus_NCBI_id = Column(String, unique=True, nullable=True)
-    uniprot_id = Column(String, unique=True, nullable=True)
-    struct_prot_type = Column(Integer, nullable=True)
-    dna_seq = Column(
-        String, nullable=False, unique=True
-    )  # New addition for testing Name instead of gen table
 
-    # Introduce back_populates so when a relationship between different tables is
-    # introduced, they information will be back-populated to be consistent across
-    # all tables. Relationships must be introduced in both related tables (e.g.:
-    # Gene and Protein, with relationship based on table ProteinGene)
-    # complexes = relationship(
-    #     "Complex", secondary=proteincomplex, back_populates="proteins", lazy="dynamic"
-    #     )
-    # interacts = relationship(
-    #     "Protprotinteract",  secondary=proteincomplex, back_populates="proteins", lazy="dynamic"
-    #     )
-    # Define type of output for protein
+    # Define Protein table columns using Declarative:
+    prot_id: Mapped[Optional[int]] = mapped_column(
+        primary_key=True, autoincrement=True
+    )  # Autopopulated ID for local table
+    prot_accession: Mapped[Optional[str]] = mapped_column(
+        nullable=False, unique=True
+    )  # A unique accession number, must be present
+    prot_seq: Mapped[Optional[str]] = mapped_column(nullable=False, unique=True)
+    is_canonical: Mapped[Optional[bool]] = mapped_column(
+        default=True
+    )  # True/False flag for whether this protein is canonical
+    #    struct_prot_type = Column(SQLEnum(StructProtType, name="struct_prot_type_enum"))  # Not currently defined
+
+    # Define relationships to other tables in Declarative
+    references: Mapped["ProteinXref"] = relationship(back_populates="protein")
+    cds: Mapped["Cds"] = relationship(back_populates="protein")
+    names: Mapped["ProteinName"] = relationship(back_populates="protein")
+    isoforms: Mapped["Isoforms"] = relationship(back_populates="isoform")
+    canonicals: Mapped["Isoforms"] = relationship(back_populates="canonical")
+    complexes: Mapped["ProteinComplex"] = relationship(back_populates="protein")
+    interaction_1: Mapped["Prot_prot_interact"] = relationship(
+        back_populates="protein_1"
+    )
+    interaction_2: Mapped["Prot_prot_interact"] = relationship(
+        back_populates="protein_2"
+    )
+
+    # Define string representation of protein row
     def __str__(self):
         outstr = [
             f"Protein ID: {self.prot_id}",
-            f"Protein sequence: {self.prot_seq}",
-            f"NCBI ID: {self.locus_NCBI_id}",
-            f"Uniprot ID: {self.uniprot_id}",
+            f"Protein accession: {self.prot_id}, Protein sequence: {self.prot_seq}",
             f"Protein structure type: {self.struct_prot_type}",
-            f"DNA sequence: {self.dna_seq}",
+            f"Protein is canonical: {self.is_canonical}",
         ]
         return "\n".join(outstr)
 
 
+class Xdatabase(Base):
+    """Each row describes an external database"""
+
+    __tablename__ = "xdatabase"
+
+    # Define database row using Declarative
+    xref_db_id: Mapped[int] = mapped_column(
+        primary_key=True, autoincrement=True
+    )  # Local id for database
+    xref_db_name: Mapped[str] = mapped_column(
+        nullable=False, unique=True
+    )  # Database with crossref
+    xref_href: Mapped[str] = mapped_column(
+        nullable=False, unique=True
+    )  # URL to database
+    #    xref_type = Column(SQLEnum(DatabaseType, name ="database_type_enum", nullable=False))   # Not currently defined
+
+    # Define relationships using Declarative
+    xref: Mapped["Xref"] = relationship(back_populates="xref_db_id")
+    databases: Mapped[list["Xref"]] = relationship()
+
+
+class Xref(Base):  # All external references
+    """Each row describes an external database cross-reference"""
+
+    __tablename__ = "xref"
+
+    # Define table content:
+    xref_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    xref_acc_ext: Mapped[str] = mapped_column(
+        nullable=False, unique=True
+    )  # External DB accession
+    xref_db_id: Mapped[int] = mapped_column(
+        ForeignKey("xdatabase.xref_db_id"),
+        nullable=False,
+    )
+
+    # Define relationships using Declarative
+    xref_db: Mapped["Xdatabase"] = relationship(back_populates="databases")
+    proteins: Mapped["ProteinXref"] = relationship(back_populates="xref")
+    cdss: Mapped["CdsXref"] = relationship(back_populates="cds")
+
+
+class ProteinXref(Base):
+    """Linker table, protein to database cross-reference"""
+
+    __tablename__ = "protein_xref"
+    # Require a unique combination of protein ID and crossreference ID
+    __table_args__ = (PrimaryKeyConstraint("prot_id", "xref_id"),)
+
+    prot_id: Mapped[int] = mapped_column(
+        ForeignKey("protein.prot_id"),  # primary_key=True
+    )
+    xref_id: Mapped[int] = mapped_column(
+        ForeignKey("xref.xref_id"),
+    )
+
+    # Define relationships using Declarative
+    protein: Mapped["Protein"] = relationship(back_populates="references")
+    xref: Mapped["Xref"] = relationship(back_populates="proteins")
+
+
+class Cds(Base):
+    """Each row describes a unique CDS.
+
+    The table stores
+
+    - gene ID,
+    - DNA sequence,
+    - origin sequences if engineered,
+    - accession number
+    - and the corresponding protein.
+    """
+
+    __tablename__ = "cds"
+
+    # Define table content  using declarative:
+    cds_id: Mapped[int] = mapped_column(
+        primary_key=True, autoincrement=True
+    )  # Autopopulated ID for local table
+    cds_seq: Mapped[str] = mapped_column(
+        nullable=False, unique=True
+    )  # Gene DNA sequence
+    cds_accession: Mapped[str] = mapped_column(
+        nullable=False, unique=True
+    )  # Unique accession number for CD
+    prot_id: Mapped[int] = mapped_column(ForeignKey("protein.prot_id"), nullable=False)
+
+    # Introduce all relationship between tables: Check this?
+    protein: Mapped["Protein"] = relationship(back_populates="cds")
+    origins: Mapped["Origin"] = relationship(back_populates="origin")
+    cdss: Mapped["Origin"] = relationship(back_populates="cds")
+    references: Mapped["CdsXref"] = relationship(back_populates="cds_xref")
+    modifications: Mapped["CdsModification"] = relationship(back_populates="cds")
+
+
+class Origin(Base):
+    """Each row describes the link between original and modified CDS.
+
+    The table stores
+
+    - original DNA sequence id,
+    - the corresponding modified CDS id.
+    """
+
+    __tablename__ = "origin"
+    __table_args__ = (PrimaryKeyConstraint("origin_id", "cds_id"),)
+
+    # Define table content:
+    origin_id: Mapped[int] = mapped_column(
+        ForeignKey("cds.cds_id"), nullable=False
+    )  # Foreign key, original CDS sequence (cds_id key)
+    cds_id: Mapped[int] = mapped_column(
+        ForeignKey("cds.cds_id"), nullable=False
+    )  # Foreign key, modified CDS sequence (cds_id key)
+
+    # Introduce all relationship between tables:
+    cds: Mapped["Cds"] = relationship(back_populates="cds")
+    origin: Mapped["Cds"] = relationship(back_populates="origins")
+
+
+class CdsXref(Base):
+    """Linker table, CDS to database cross-reference"""
+
+    __tablename__ = "cds_xref"
+    __table_args__ = (PrimaryKeyConstraint("cds_id", "xref_id"),)
+
+    # Define table content:
+    cds_id: Mapped[int] = mapped_column(
+        ForeignKey("cds.cds_id"),
+    )
+    xref_id: Mapped[int] = mapped_column(
+        ForeignKey("xref.xref_id"),
+    )
+
+    # Introduce all relationship between tables:
+    cds: Mapped["Cds"] = relationship(back_populates="references")
+    x_ref: Mapped["Xref"] = relationship(back_populates="cdss")
+
+
+class Modification(Base):
+    """Each row represents a unique modification applied to a CDS.
+
+
+    The table stores
+
+    - modification ID,
+    - modification type (enum): truncated, extended, fusion, synthetic, mutated, domesticated,
+    - description of the modification.
+    """
+
+    __tablename__ = "modification"
+    # __table_args__ = (UniqueConstraint("modification_description", "modification_type"),)
+
+    # Define table content using declarative:
+    modification_id: Mapped[int] = mapped_column(
+        primary_key=True, autoincrement=True
+    )  # Autopopulated ID for local table
+    modification_description: Mapped[str] = mapped_column(nullable=False)
+
+    #    modification_type = Column(SQLEnum(ModificationType, name="modification_type_enum"), nullable=False)   # Not currently defined
+
+    # Introduce all relationship between tables:
+    modifications: Mapped["CdsModification"] = relationship(
+        back_populates="modification"
+    )
+
+
+class CdsModification(Base):
+    """Each row represents a unique modification applied to a CDS.
+
+    The table stores
+
+    - modification ID,
+    - CDS ID.
+    """
+
+    __tablename__ = "cds_modification"
+    __table_args__ = (PrimaryKeyConstraint("cds_id", "modification_id"),)
+
+    # Define table content:
+    cds_id: Mapped[int] = mapped_column(ForeignKey("cds.cds_id"))
+    modification_id: Mapped[int] = mapped_column(
+        ForeignKey("modification.modification_id")
+    )
+
+    # Introduce all relationship between tables:
+    modification: Mapped["Modification"] = relationship(back_populates="modifications")
+    cds: Mapped["Cds"] = relationship(back_populates="modifications")
+
+
 class Name(Base):
-    """Table representing a gene name
-    Each gene_ID represents a gene name. Several name strings
-    given to an unique protein, and several proteins sharing same name
+    """Each row describes a protein name.
+
+    The table stores
+
+    - name ID,
+    - protein name.
+
+
     """
 
     __tablename__ = "name"
-    # Introduce all relationship between tables:
-    proteins: Mapped[list["ProteinName"]] = relationship()
-    # Define table content:
-    name_id = Column(
-        Integer, primary_key=True, autoincrement=True
+
+    # Define table content in Declarative:
+    name_id: Mapped[int] = mapped_column(
+        primary_key=True, autoincrement=True
     )  # primary key column
-    gene_name = Column(String, nullable=False)
-    # dna_seq = Column(String, nullable=False) removed as it will be part of the protein identity
+    prot_name: Mapped[str] = mapped_column(nullable=False)
+
+    # Introduce all relationship between tables:
+    proteins: Mapped[list["ProteinName"]] = relationship(back_populates="name")
 
 
-class Taxonomy(Base):
-    """Table representing the taxon accession of a protein
-    This table will store the taxon origin of the protein sequence, e.g.:
-    specie, genus, family... and a accession number to a database with details
-    about that organism
+class ProteinName(Base):
+    """Each row describes a protein name associated to a protein.
+
+    The table stores
+
+    - protein ID,
+    - name ID.
+    Several proteins can share the same name
+    A name can be shared by several proteins
     """
 
-    __tablename__ = "taxonomy"
-    # Introduce all relationship between tables:
-    proteins: Mapped[list["ProteinTaxonomy"]] = relationship()
+    __tablename__ = "protein_name"
+    __table_args__ = (PrimaryKeyConstraint("prot_id", "name_id"),)
+
     # Define table content:
-    tax_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
-    tax_ref = Column(String, unique=True, nullable=False)  # accession number in db
-    tax_db = Column(String, nullable=False)  # Name of database used (e.g.: NCBI, GTDB)
-    species = Column(String, nullable=False)
-    genus = Column(String)
-    family = Column(String)
-    order_tax = Column(String)
-    phylum = Column(String)
-    class_tax = Column(String)
-    strain = Column(String)
-    # To enforce unique taxonomy references
-    __table_args__ = (UniqueConstraint("species", "strain"),)
-
-
-class Pdb(Base):
-    """Table representing the Pdb accession of a protein
-    This table will store the different pdb accession number that represent the
-    structure of a protein
-    """
-
-    __tablename__ = "pdb"
-    # Introduce all relationship between tables:
-    proteins: Mapped[list["ProteinPdb"]] = relationship()
-    # Define table content:
-    pdb_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
-    pdb_acc_1 = Column(String, unique=True)  # primary accession number in pdb
-    pdb_acc_2 = Column(String, nullable=False)  # accession number
-    pdb_acc_3 = Column(String, nullable=False)  # accession number
-
-
-class Domain(Base):
-    """Table representing the conserved domain family of a protein
-    This table will store the different conserved domain accession number that represent the
-    structure of a protein, including the reference database where the accession number
-    was taken
-    """
-
-    __tablename__ = "domain"
-    # Introduce all relationship between tables:
-    proteins: Mapped[list["ProteinDomain"]] = relationship()
-    # Define table content:
-    dom_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
-    dom_ref = Column(
-        String, unique=True, nullable=False
-    )  # domain accession in external db
-    dom_db = Column(Integer, nullable=False)  # external database name e.g. pfam, CDD
-    # To enforce unique domain family references
-    __table_args__ = (UniqueConstraint("dom_id", "dom_ref"),)
-
-
-class Function(Base):
-    """Table representing a function of a protein
-    This table will store the different Gene Ontology accession numbers, type and
-    description of the function.
-    The types can be MF (molecular function), CC (cellular compartment),
-    or BP (biological process)
-    """
-
-    __tablename__ = "function"
-    # Introduce all relationship between tables:
-    proteins: Mapped[list["ProteinFunction"]] = relationship()
-    # Define table content:
-    go_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
-    go_ref = Column(String, unique=True, nullable=False)  # accession number in GO
-    go_type = Column(String, nullable=False)  # GO type (MF,CC,BP)
-    go_description = Column(String, nullable=False)  # text description of function
-    # To enforce unique function references
-    __table_args__ = (UniqueConstraint("go_id", "go_ref"),)
-
-
-class EnzymePath(Base):
-    """Table representing the enzymatic reaction in which the protein
-    participates
-    This table will store the different Kegg Ontology accession numbers
-    related wit an specific function of a protein. Thus, a protein can have
-    more than one reference
-    """
-
-    __tablename__ = "enzyme_path"
-    # Introduce all relationship between tables:
-    proteins: Mapped[list["ProteinPath"]] = relationship()
-    # Define table content:
-    path_id = Column(
-        Integer, primary_key=True, autoincrement=True
-    )  # primary key column
-    KO_ref = Column(String, unique=True, nullable=False)  # accession number in KO
-    # To enforce unique enzymatic pathway references
-    __table_args__ = (UniqueConstraint("path_id", "KO_ref"),)
-
-
-# class Complex(Base):
-#     """Table representing the complex that can be form by the interaction
-#     between several proteins, including native BMC or engineered ones
-#     This table will store the complex features, including the type (e.g: pdu, eut),
-#     whether is has enzymatic activty or not, if it has been experimentally tested
-#     whether it assembles or not, the origin of the complex (meaning whether is it
-#     a native complex, engineered or created with a theorical or bioinformatic approach)
-#     """
-#     __tablename__ = "complex"
-#     complex_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
-#     complex_type = Column(String) # Classification undecided (pdueut,grm..)
-#     complex_activity = Column(String, nullable=False) # Active/Inactive
-#     assembly_exp_tested = Column(String, nullable=False) #Y/N. If Y reference paper?
-#     complex_source = Column(String, nullable=False) #Native/engineered/theoretical...
-#     # A many-to-many relationship between Protein and enzymatic activity
-#     proteins = relationship(
-#         "Protein", secondary=proteincomplex, back_populates="complexes", lazy="dynamic")
-# # To enforce unique no repeated complexes are created
-#     __table_args__ = (UniqueConstraint("complex_id", "complex_type", "complex_activity", "assembly_exp_tested", "complex_source"),)
-# class Prot_port_interact(Base):
-#     """Table representing the different specific interactions
-#     between several proteins inside a complex and during assembly
-#     This table will store the different proteins known to interact specifically.
-#     Prot_ID_1 will be the main protein, with the rest of the proteins being the
-#     ones interacting with it
-#     """
-#     __tablename__ = "prot_prot_interact"
-#     ppi_id = Column(Integer, primary_key=True, autoincrement=True)  # primary key column
-#     prot_id_1 = Column(Integer, ForeignKey("Protein.prot_id"))
-#     prot_id_2 = Column(Integer, ForeignKey("Protein.prot_id"))
-#     prot_id_3 = Column(Integer, ForeignKey("Protein.prot_id"))
-#     prot_id_4 = Column(Integer, ForeignKey("Protein.prot_id"))
-#     prot_id_5 = Column(Integer, ForeignKey("Protein.prot_id"))
-#     prot_id_6 = Column(Integer, ForeignKey("Protein.prot_id"))
-#     prot_id_7 = Column(Integer, ForeignKey("Protein.prot_id"))
-#     # A many-to-many relationship between Protein and enzymatic activity
-#     proteins = relationship(
-#         "Protein", secondary=proteincomplex, back_populates="interacts", lazy="dynamic")
-# # To enforce unique no repeated protein to protein interactions are created
-#     __table_args__ = (UniqueConstraint("prot_id_1", "prot_id_2", "prot_id_3", "prot_id_4", "prot_id_5", "prot_id_6", "prot_id_7"),)
-
-
-# Function for protein data addition
-def protein_addition(session, protseq, NCBIid, uniprot, struct, dnaseq):
-    # Args:
-    # protseq (str): Protein sequence.
-    # NCBIid (str): NCBI locus ID.
-    # uniprot (str): UniProt ID.
-    # struct (str): Protein structure type.
-    # dnaseq (str): Gene DNA sequence.
-
-    # Explanation on how the code works:
-    # 1. If the protein already exists, store it in the `protein` variable
-    # 2. If the protein does not exist, create a new protein object and add it to
-    #    the session
-    # 3. Commit the session to the database
-
-    ## NOTE: SQLAlchemy will autoflush the session when we query the database, so we
-    ##       do not need to manually flush the session before committing
-    ##       (https://docs.sqlalchemy.org/en/20/orm/session_basics.html#session-flushing)
-    ##       This will also automatically commit the session if no exceptions are
-    ##       raised but, if errors are raised, we will need to rollback the session
-    ##       and continue to the next entry.
-
-    print(f"\nNow in {protein_addition.__name__}")
-
-    print(
-        f"Before query, {protseq[:10]=}..., {NCBIid=}, {uniprot=}, {struct=}, {dnaseq[:10]=}"
+    prot_id: Mapped[int] = mapped_column(
+        ForeignKey("protein.prot_id"),
     )
-    # Create a new protein object
-    protein = (
-        session.query(Protein)
-        # Prot_id added automatically
-        .filter(Protein.prot_seq == protseq)
-        .filter(Protein.locus_NCBI_id == NCBIid)
-        .filter(Protein.uniprot_id == uniprot)
-        # Protein struct is just the type (e.g.: hexamer), will be repeated
-        .first()
+    name_id: Mapped[int] = mapped_column(
+        ForeignKey("name.name_id"),
     )
-    print(f"After query, {protein=}")
 
-    # Add protein if it is not already present
-    if not protein:
-        protein = Protein(
-            prot_seq=protseq,
-            locus_NCBI_id=NCBIid,
-            uniprot_id=uniprot,
-            struct_prot_type=struct,
-            dna_seq=dnaseq,
-        )
-        session.add(protein)
-        session.flush()  # This sends the changes to the database, so prot_id is assigned
-    else:
-        print(f"Protein with prot id XXXX and NCBI_id {NCBIid} already exists")
+    # Introduce all relationship between tables:
+    name: Mapped["Name"] = relationship(back_populates="proteins")
+    protein: Mapped["Protein"] = relationship(back_populates="names")
 
-    print(f"Protein row returned: {protein}")
 
-    # Try to commit our changes
-    # print("Committing changes")
-    # session.commit()
+class Isoforms(Base):
+    """Each row describes a protein isoform relationship with its canonical protein.
 
-    # except Exception as exc:
-    #     print(f"Error committing protein/gene combination: {exc}")
-    #     print("Rolling back changes and skipping to next entry\n")
-    #     session.rollback()
-    # Rollback makes it that when there is a "fail",
-    # like not unique uniprot reference, its "forgets" the error and keeps going.
-    return (
-        protein  # Return the protein row we just added to the db/otherwise dealt with
+    The table stores
+
+    - canonical protein ID,
+    - isoform protein ID.
+
+    Several isoforms can be associated to a canonical protein.
+    An isoform can only be associated to one canonical protein.
+    """
+
+    __tablename__ = "isoforms"
+    __table_args__ = (PrimaryKeyConstraint("canonical__prot_id", "isoform__prot_id"),)
+
+    # Define table content:
+    canonical__prot_id: Mapped[int] = mapped_column(
+        ForeignKey("protein.prot_id"),
+    )
+    isoform__prot_id: Mapped[int] = mapped_column(
+        ForeignKey("protein.prot_id"),
+    )
+
+    # Introduce all relationship between tables:
+    isoform: Mapped["Protein"] = relationship(back_populates="isoforms")
+    canonical: Mapped["Protein"] = relationship(back_populates="canonicals")
+
+
+class Complex(Base):
+    """Each row describes a unique BMC-like complex.
+
+    The table stores
+
+    - complex ID,
+    - complex name,
+    - complex type (PDU, EUT...),
+    - complex source (native, engineered, predicted, theoretical),
+    - whether it is active,
+    - whether it has been experimentally tested.
+    """
+
+    __tablename__ = "complex"
+    __table_args__ = (
+        UniqueConstraint(
+            "complex_accession",
+            "complex_type",
+            "is_active",
+            "is_exp_tested",  # "complex_source"
+        ),
+    )  # To avoid duplicate entries, needs further thought
+
+    # Define table content in Declarative:
+    complex_id: Mapped[int] = mapped_column(
+        primary_key=True, autoincrement=True
+    )  # Autopopulated ID for local table
+    complex_accession: Mapped[str] = mapped_column(nullable=False)
+    complex_type: Mapped[str] = mapped_column(
+        nullable=False
+    )  # Classification undecided (pdu,eut,grm..)
+    is_active: Mapped[Optional[bool]] = mapped_column(nullable=True)  # Active/Inactive.
+    is_exp_tested: Mapped[Optional[bool]] = mapped_column(nullable=True)  # Y/N.
+    #    complex_source = Column(SQLEnum(ComplexSource, name="complex_source_enum"), nullable=False)  # Not currently defined
+
+    # Introduce all relationship between tables:
+    proteins: Mapped["ProteinComplex"] = relationship(
+        "ProteinComplex",
+        secondary="protein_complex",
+        back_populates="complexes",
+        lazy="dynamic",
     )
 
 
-# Function for name data addition
-def name_addition(session, genename, namerank, protein):
-    # Args:
-    # name (str): Gene name.
-    # namerank (int): Rank of the gene name associated with the protein.
-    # protein: Protein information added with protein_addition function
+class ProteinComplex(Base):
+    """Each row describes a unique protein-complex relationship.
 
-    # Explanation on how the code works:
-    # 1. Check if the name already exists,  store it in the `name` variable
-    # 2. If the name does not exist, create a new name object and add it to the
-    #    session
-    # 3. Check if the name is already associated with the protein, and if not
-    #    create a new `proteinname` object and add it to the session
-    # 4. Commit the session to the database
+    The table stores
 
-    print(f"\nNow in {name_addition.__name__}")
+    - protein ID,
+    - complex ID,
+    - whether the protein is essential for the complex assembly,
+    - copy number of the protein in the complex.
+    """
 
-    with session.no_autoflush:
-        # try:
-        print(f"Before query, {genename=}")
+    __tablename__ = "protein_complex"
+    __table_args__ = (PrimaryKeyConstraint("prot_id", "complex_id"),)
 
-        # Create a new name object
-        name = (
-            session.query(Name)
-            # name_id automatically assigned
-            .filter(Name.gene_name == genename)
-            .first()
-        )
-        print(f"After query, {name=}")
+    # Define table content:
+    prot_id: Mapped[int] = mapped_column(
+        ForeignKey("protein.prot_id"),
+    )
+    complex_id: Mapped[int] = mapped_column(
+        ForeignKey("complex.complex_id"),
+    )
 
-        # Add name if it is not already present
-        if not name:
-            name = Name(gene_name=genename)
-            session.add(name)
-            session.flush()
-            print(f"Name {genename=} added")
-        else:
-            print(f"This gene name {genename} has already being added")
-        print(f"Name row returned: {name}")
+    is_essential: Mapped[Optional[bool]] = mapped_column(
+        default=False, nullable=True
+    )  # Whether the protein is essential for the complex assembly
+    copy_number: Mapped[Optional[int]] = mapped_column(
+        nullable=True
+    )  # Copy number of the protein in the complex
 
-        # Associate the gene name and protein information in the protein_gene table
-        # Leighton suggested to make a specific function only for merged tables,
-        # I think I want them linked because if I add a gene I want the information
-        # instantly available for my protein and linked. need to double check with LP
-        print(f"{name.proteins=}, {type(name.proteins)}")
-
-        if name not in name.proteins:
-            print(f"{protein.prot_id=}, {name.name_id=}, {namerank=}")
-            proteinname = ProteinName(name_rank=int(namerank))
-            # Name rank in there as is a new addition to the proteinname table
-            # not in name or protein
-            print(f"{name.proteins=}")
-            proteinname.name = name
-            print(f"{proteinname=}")
-            print(f"{name.proteins=}")
-            protein.names.append(proteinname)
-            print(f"{name.proteins=}")
-            print(f"\nLinked Gene name {name.name_id} to Protein {protein.prot_id}")
-            print(f"{proteinname=}")
-        else:
-            print(
-                f"Gene name {name.name_id} is already linked to Protein {protein.prot_id}"
-            )
-        print(f"{name}")
-        # print(f"Linked gene from protein: {proteingene.gene}")
-
-        # Try to commit our changes
-        # print("Committing changes")
-        # session.commit()
-
-        # except Exception as exc:
-        #     print(f"Error committing protein/gene combination: {exc}")
-        #     print("Rolling back changes and skipping to next entry")
-        #     session.rollback()
-        # Rollback makes it that when there is a "fail",
-        # like not unique uniprot reference, its "forgets" the error and keeps going.
-        return name  # Return the gene row we just added to the db/otherwise dealt with
+    # Introduce all relationship between tables:
+    complex: Mapped["Complex"] = relationship(back_populates="proteins")
+    protein: Mapped["Protein"] = relationship(back_populates="complexes")
 
 
-# Function for taxonomy data addition:
-def taxonomy_addition(
-    session, taxref, taxdb, spec, genu, fam, order, phyl, classt, stra, protein
-):
-    # Args:
-    # taxref (str): Taxonomy reference ID
-    # taxdb (str): Taxonomy database used for reference ID
-    # spec (str): Specie (taxonomy classification)
-    # genu (str): Genus (taxonomy classification)
-    # fam (str): Family (taxonomy classification)
-    # order (str): Order (taxonomy classification)
-    # phyl (str): Phylogeny (taxonomy classification)
-    # classt (str): Class (taxonomy classification)
-    # stra (str): Strain (taxonomy classification)
-    # protein: Protein information added with protein_addition function
+class Interaction(Base):
+    """Each row describes a unique protein-protein interaction.
 
-    # Explanation on how the code works:
-    # 1. Check if the taxonomy already exists, and if so store it in the `tax`
-    #    variable
-    # 2. If the taxonomy does not exist, create a new gene object and add it to the
-    #    session
-    # 3. Then check if the taxonomy is already associated with the protein being added, and if not
-    #    create a new `proteintax` object and add it to the session
-    # 4. Commit the session to the database
+    The table stores
 
-    print(f"\nNow in {taxonomy_addition.__name__}")
+    - interaction ID,
+    - interaction type,
+    - interaction description.
+    """
 
-    # LP: Had to turn off autoflushing to suppress an error here
-    # See https://github.com/sqlalchemy/sqlalchemy/discussions/12049=
-    with session.no_autoflush:
-        print(
-            f"Before query, {taxref=}, {taxdb=}, {spec=}, {genu=}, {fam=}, {order=}, {phyl=}, {classt=}, {stra=}"
-        )
-        # Create a new taxonomy object
-        taxonomy = session.query(Taxonomy).filter(Taxonomy.tax_ref == taxref).first()
-        print(f"After query, {taxonomy=}")
+    __tablename__ = "interaction"
+    __table_args__ = (UniqueConstraint("interact_type", "interact_description"),)
 
-        # Add taxonomy if it is not already present
-        if not taxonomy:
-            taxonomy = Taxonomy(
-                tax_ref=taxref,
-                tax_db=taxdb,
-                species=spec,
-                genus=genu,
-                family=fam,
-                order_tax=order,
-                phylum=phyl,
-                class_tax=classt,
-                strain=stra,
-            )
-            session.add(taxonomy)
-            session.flush()
-            print(f"Taxonomy {taxref=} added")
-        else:
-            print(f"This taxonomy {taxref} already exists")
+    # Define table content in declarative:
+    interact_id: Mapped[int] = mapped_column(
+        primary_key=True, autoincrement=True
+    )  # Autopopulated ID for local table
+    interact_type: Mapped[str] = mapped_column(
+        nullable=False
+    )  # Type of interaction (e.g: electrostatic, hydrophobic, etc)
 
-        print(f"Taxonomy row returned: {taxonomy}")
+    interact_description: Mapped[Optional[str]] = mapped_column(
+        nullable=True
+    )  # Description of the interaction
 
-        # Associate the taxonomy with the protein information in the protein_tax table
-        print(f"{taxonomy.proteins=}, {type(taxonomy.proteins)}")
-
-        if taxonomy not in taxonomy.proteins:
-            print(f"{protein.prot_id=}, {taxonomy.tax_id=}")
-            proteintaxonomy = ProteinTaxonomy()
-            print(f"{taxonomy.proteins=}")
-            proteintaxonomy.taxonomy = taxonomy
-            print(f"{proteintaxonomy=}")
-            print(f"{taxonomy.proteins=}")
-            protein.taxonomies.append(proteintaxonomy)
-            print(f"{taxonomy.proteins=}")
-            print(f"Linked Taxonomy {taxonomy.tax_id} to Protein {protein.prot_id}")
-            print(f"{proteintaxonomy=}")
-            session.flush()
-        else:
-            print(
-                f"Taxonomy {taxonomy.tax_id} is already linked to Protein {protein.prot_id}"
-            )
-        print(f"{taxref}, {spec}, {stra}")
-
-        #     # Try to commit our changes;
-        #     print("Committing changes")
-        #     session.commit()
-
-        # except Exception as exc:
-        #     print(f"Error committing protein/gene combination: {exc}")
-        #     print("Rolling back changes and skipping to next entry")
-        #     session.rollback()
-        return taxonomy  # Return the taxonomy row we just added to the db/otherwise dealt with
+    # Introduce all relationship between tables:
+    interactions: Mapped["Prot_prot_interact"] = relationship(
+        back_populates="interaction"
+    )
 
 
+class Prot_prot_interact(Base):
+    """Each row describes a unique protein-protein interaction between two  specific proteins.
+
+    The table stores
+
+    - interaction ID,
+    - protein ID 1,
+    - protein ID 2.
+    """
+
+    __tablename__ = "prot_prot_interact"
+    __table_args__ = (PrimaryKeyConstraint("interact_id", "prot_id_1", "prot_id_2"),)
+
+    # Define table content:
+    interact_id: Mapped[int] = mapped_column(
+        ForeignKey("interaction.interact_id"),
+    )
+    prot_id_1: Mapped[int] = mapped_column(
+        ForeignKey("protein.prot_id"),
+    )
+    prot_id_2: Mapped[int] = mapped_column(
+        ForeignKey("protein.prot_id"),
+    )
+
+    # Introduce all relationship between tables:
+    protein_1: Mapped["Protein"] = relationship(back_populates="interaction_1")
+    protein_2: Mapped["Protein"] = relationship(back_populates="interaction_2")
+    interaction: Mapped["Interaction"] = relationship(back_populates="interactions")
+
+
+""" Functions to add data to the database"""
+
+# # Function for protein data addition
+# def protein_addition(session, protaccession, protseq, struct, canonical):
+
+#     '''
+#     Args:
+#     protseq (str): Protein sequence.
+#     protaccession (str): Protein unique accession number
+#     struct (str): Protein structure type.
+#     canonical (boolean): Canonical if true, false if isoform
+
+#     Explanation on how the code works:
+#     1. If the protein already exists, store it in the `protein` variable
+#     2. If the protein does not exist, create a new protein object and add it to
+#        the session
+#     3. Commit the session to the database
+
+#     NOTE: SQLAlchemy will autoflush the session when we query the database, so we
+#           do not need to manually flush the session before committing
+#           (https://docs.sqlalchemy.org/en/20/orm/session_basics.html#session-flushing)
+#            This will also automatically commit the session if no exceptions are
+#           raised but, if errors are raised, we will need to rollback the session
+#           and continue to the next entry.
+#     '''
+
+#     print(f"\nNow in {protein_addition.__name__}")
+
+#     print(
+#         f"Before query, {protseq[:10]=}..., {protaccession=}, {struct=}, {canonical=}"
+#     )
+
+# Check and convert xtype
+# if isinstance(xtype, str):
+#     try:
+#         xtype = enum_from_str(StructProtType, xtype)
+#     except ValueError as e:
+#         print(f"Invalid protein type: {xtype!r} — {e}")
+#         return None
+
+#     # Create a new protein object
+#     protein = (
+#         session.query(Protein)
+#         .filter(Protein.prot_seq == protseq)
+#         .filter(Protein.prot_accession == protaccession) # Do I need this?
+#         .first()
+#     )
+#     print(f"After query, {protein=}")
+
+#     # Add protein if it is not already present
+#     if not protein:
+#         protein = Protein(
+#             prot_seq=protseq,
+#             prot_accession=protaccession,
+#             struct_prot_type=struct,
+#             is_canonical=canonical,
+#         )
+#         session.add(protein)
+#         session.flush()  # This sends the changes to the database, so prot_id is assigned
+#     else:
+#         print(f"Protein with accession number {protaccession} already exists")
+
+#     print(f"Protein row returned: {protein}")
+
+#     # except Exception as exc:
+#     #     print(f"Error committing protein/gene combination: {exc}")
+#     #     print("Rolling back changes and skipping to next entry\n")
+#     #     session.rollback()
+#     # Rollback makes it that when there is a "fail",
+#     # like not unique uniprot reference, its "forgets" the error and keeps going.
+#     return (
+#         protein  # Return the protein row we just added to the db
+#     )
+
+# # Function for Xdatabase data addition
+# def xdatabase_addition(session, xname, href, xtype):
+
+#     ''' Args:
+#     xdb_name (str): Database name.
+#     href (str): Database URL.
+#     xdb_type (str): Database type (sequence, structure, function, taxonomy)
+
+#     Explanation on how the code works:
+#     1. Check if the database already exists,  store it in the `xdb` variable
+#     2. If the database does not exist, create a new db object and add it to the
+#        session
+#     3. Commit the session to the database
+#     '''
+
+#     print(f"\nNow in {xdatabase_addition.__name__}")
+#     print(f"Before query, {xname=}, {href=}, {xtype=}")
+
+# Check and convert xtype
+# if isinstance(xtype, str):
+#     try:
+#         xtype = enum_from_str(DatabaseType, xtype)
+#     except ValueError as e:
+#         print(f"Invalid database type: {xtype!r} — {e}")
+#         return None
+
+# elif not isinstance(xtype, DatabaseType):
+#     print(f"xtype must be a string or DatabaseType, got {type(xtype)}")
+#     return None
+# print(f"Converted xtype to Enum: {xtype}")
+
+#     # Create a new db object
+#     xdb = (
+#         session.query(Xdatabase)
+#         .filter(Xdatabase.xref_db_name == xname)
+#         .filter(Xdatabase.xref_href == href)
+#         .first()
+#     )
+#     print(f"After query, {xdb=}")
+
+#     # Add db if it is not already present
+#     if not xdb:
+#         xdb = Xdatabase(xref_db_name=xname, xref_href=href, xref_type=xtype)
+#         session.add(xdb)
+#         session.flush()
+#         print(f"Database {xname} added")
+#     else:
+#         print(f"This database {xname} has already being added")
+#     print(f"Database row returned: {xdb}")
+
+#     return xdb  # Return the db row we just added to the db/otherwise dealt with
+
+# # Function for CDS data addition
+# def cds_addition(session, cdsseq, cdsaccession, cdsorigin, protein):
+
+#     ''' Args:
+#     cdsseq (str): Gene DNA sequence.
+#     cdsaccession: (str) Unique accession number CDS
+#     cds_origin (str): Original CDS sequence if the sequence is modified.
+#     protein: Protein information added with protein_addition function
+
+#     Explanation on how the code works:
+#     1. Check if the cds already exists,  store it in the `cds` variable
+#     2. If the cds does not exist, create a new cds object and add it to the
+#        session
+#     3. Check if the cds is already associated with the protein, and if not
+#        create a new `proteingene` object and add it to the session
+#     4. Commit the session to the database
+#     '''
+
+#     print(f"\nNow in {cds_addition.__name__}")
+
+#     print(f"Before query, {cdsseq[:10]=}...,{cdsaccession=} {cdsorigin=}")
+
+#     # Create a new cds object
+#     cds = (
+#         session.query(Cds)
+#         .filter(Cds.cds_seq == cdsseq)
+#         .first()
+#     )
+#     print(f"After query, {cds=}")
+
+#     # Add cds if it is not already present
+#     if not cds:
+#         print(f"Before adding seq and accession {cds=}")
+#         cds = Cds(
+#             cds_seq=cdsseq,
+#             cds_accession=cdsaccession,
+#             protein=protein, # Use relationship not FK directly
+#             origin=cdsorigin) # Use relationship not FK directly
+#         print(f" After adding seq and accession{cds=}")
+#         print(f"{protein.prot_id=}, {cds.cds_id=}, {cds.prot_id}")
+#         print(f"{protein.cdss=}")
+#         session.add(cds)
+#         session.flush()
+#         print(f"Cds {cdsseq[:10]=} with accession {cdsaccession=} added")
+#     else:
+#         print(f"This CDS {cdsseq[:10]=} with accession {cdsaccession=} has already being added")
+
+#     print(f"Cds row returned: {cds}")
+
+#     return cds  # Return the cds row we just added to the db/otherwise dealt with
+
+# # Function for xref data addition and linking to cds and protein
+# def xref_addition(session, xdb, cds, protein, xrefacc):
+
+#     ''' Args:
+#         xdb: Xdatabase ORM object (external DB already added)
+#         cds: Cds ORM object
+#         protein: Protein ORM object
+#         xrefacc (str): accession string for this external reference
+
+#     Explanation on how the code works:
+#     1. Check if the xref already exists,  store it in the `xref` variable
+#     2. If the xref does not exist, create a new xref object and add it to the
+#        session
+
+#     Need to think on how to do that, condition depending on type of database?
+#     3. Check if the xref is already associated with the cds_xref, and if not
+#        create a new `cds_xref` object and add it to the session
+#     4. Check if the xref is already associated with the prot_xref, and if not
+#        create a new `prot_xref` object and add it to the session
+
+#     4. Commit the session to the database
+#     '''
+
+#     print(f"\nNow in {xref_addition.__name__} with {xrefacc=}")
+
+#     print(f"Before query, {xdb=}, {xrefacc=}")
+
+#     # Create a new xref object
+#     xref = (
+#         session.query(Xref)
+#         .filter(Xref.xref_acc_ext == xrefacc)
+#         .first()
+#     )
+#     print(f"After query, {xref=}")
+
+#     # Add xref if it is not already present
+#     if not xref:
+#         xref = Xref(xref_acc_ext=xrefacc, XDatabase=xdb)
+#         session.add(xref)
+#         session.flush()
+#         print(f"External reference {xrefacc=} from database {xdb=} added")
+#     else:
+#         print(f"This external reference {xrefacc=} from database {xdb=} has already being added")
+#     print(f"External reference row returned: External reference {xrefacc=}")
+
+#     # Associate the reference and protein information in the prot_xref
+#     print(f"{xref.proteins=}, {type(xref.proteins)}")
+
+#     # 2. Link to Protein (ProteinXref)
+#     link_prot = (
+#         session.query(ProteinXref)
+#         # Unsure about this?
+#         .filter_by(protein==protein and xref==xref)
+#         .first()
+#     )
+
+#     if not link_prot:
+#         link_prot = ProteinXref(protein=protein, xref=xref)
+#         session.add(link_prot)
+#         print(f"Linked Protein {protein} <-> Xref {xref}")
+#     else:
+#         print(f"Protein {protein} already linked to Xref {xref}")
+
+#     # 3. Link to CDS (CdsXref)
+#     link_cds = (
+#         session.query(CdsXref)
+#         # Unsure about this?
+#         .filter_by(cds==cds and xref==xref)
+#         .first()
+#     )
+
+#     if not link_cds:
+#         link_cds = Cds_xref(cds=cds, xref=xref)
+#         session.add(link_cds)
+#         print(f"Linked CDS {cds} <-> Xref {xref}")
+#     else:
+#         print(f"CDS {cds} already linked to Xref {xref}")
+
+
+#     return xref  # Return the renference row we just added to the db/otherwise dealt with
+
+# # Function for name data addition
+# def name_addition(session, protname, protein):
+
+#     ''' Args:
+#     protname (str): Protein name.
+#     protein: Protein information added with protein_addition function
+
+#     Explanation on how the code works:
+#     1. Check if the name already exists,  store it in the `name` variable
+#     2. If the name does not exist, create a new name object and add it to the
+#        session
+#     3. Check if the name is already associated with the protein, and if not
+#        create a new `proteinname` object and add it to the session
+#     4. Commit the session to the database
+#     '''
+
+#     print(f"\nNow in {name_addition.__name__}")
+
+#     with session.no_autoflush:
+#         print(f"Before query, {protname=}")
+
+#         # Create a new name object
+#         name = (
+#             session.query(Name)
+#             .filter(Name.prot_name == protname)
+#             .first()
+#         )
+#         print(f"After query, {name=}")
+
+#         # Add name if it is not already present
+#         if not name:
+#             name = Name(prot_name=protname)
+#             session.add(name)
+#             session.flush()
+#             print(f"Name {protname=} added")
+#         else:
+#             print(f"This name {protname} has already being added")
+#         print(f"Name row returned: {name}")
+
+#         print(f"{name.proteins=}, {type(name.proteins)}")
+
+#         if name not in name.proteins:
+#             proteinname = ProteinName()
+#             proteinname.name = name
+#             protein.names.append(proteinname)
+#             print(f"{name.proteins=}")
+#             print(f"\nLinked name {name.name_id} to Protein {protein.prot_id}")
+#             print(f"{proteinname=}")
+#         else:
+#             print(
+#                 f"Name {name.name_id} is already linked to Protein {protein.prot_id}"
+#             )
+#         print(f"{name}")
+#         print(f"Linked name from protein: {proteingene.gene}")
+
+#         return name  # Return the gene row we just added to the db/otherwise dealt with
+
+#######################################################
+# (4) Helper functions that use the definitions to
+#     construct or interact with the database
+#######################################################
+
+
+# Function to create the database and tables
 def create_db(dbpath: Path):
     """Function to create all the tables from the database"""
     # Create a database engine to connect to the database.
     # This creates a new empty database file called bmc.db in the current directory.
+    logger = logging.getLogger(__name__)
+
     db_URL = f"sqlite:///{dbpath}"
+
+    logger.debug("Binding to session at %s", db_URL)
     engine = create_engine(db_URL)
     Base.metadata.create_all(bind=engine)
-    print("Database and tables created successfully")
+    logger.info("Database and tables created successfully")
 
 
+# Function to get a live session to the database
 def get_session(dbpath: Path):
     """Returns live session to database."""
-    db_URL = f"sqlite:///{dbpath}"
     engine = create_engine(db_URL)
     Session.configure(bind=engine)
     return Session()
 
 
+#######################################################
+# (5) Code that runs when this file is called as
+#     a script
+#######################################################
+
+
 if __name__ == "__main__":
-    create_db()
+    # Set up logging
+    logger = logging.getLogger()
+    logformatter = logging.Formatter(
+        "[%(levelname)s] %(funcName)s %(asctime)s %(message)s"
+    )
+    logger.setLevel(logging.DEBUG)
+
+    # Add a handler that writes to the console
+    termhandler = logging.StreamHandler(sys.stdout)
+    termhandler.setFormatter(logformatter)
+    logger.addHandler(termhandler)
+
+    logger.debug("I'm doing something - 1")
+
+    # Path to output database
+    outdbpath = Path("db.sqlite3")
+
+    # Create database
+    logger.info("Creating database at %s", outdbpath)
+    create_db(outdbpath)
+    logger.info("Created database at %s", outdbpath)
+
+    # Render database as an ER diagram
+    from eralchemy import render_er
+
+    render_er(Base, "er_diagram.pdf")
+
+## How to populate parent child relationships for CDS
+# Suppose we have CDS with the following relationships
+#
+# seq        acc     parent
+# ATG...TAC  CDS_1   NULL
+# ATG...TAC  CDS_2   CDS_1
+# ATG...TAC  CDS_3   CDS_2
+#
+# We'd parse/populate (in a function) as follows:
+#
+# line 1
+#  add CDS acc, CDS seq, and because parent is NULL, origin_cds is NULL
+# line 2
+#  as parent is CDS_1, query Cds table to get cds_id corresponding to CDS_1 (call this ID*)
+#  add CDS acc, CDS seq, and ID* (as parent)
+# line 3
+#  as parent is CDS_2, query Cds table to get cds_id corresponding to CDS_2 (call this ID**)
+#  add CDS acc, CDS seq, and ID** (as parent)

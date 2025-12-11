@@ -29,7 +29,7 @@ from file_and_data import link_db_csv
 )
 @click.option(
     "--csvpath",
-    default=Path("../data/raw/prot_info/prot_data_minimal_correct.csv"),
+    default=Path("../data/raw/prot_info/prot_data_minimal_correct_UP.csv"),
     type=click.Path(exists=False, path_type=Path),
 )
 @click.option(
