@@ -73,13 +73,13 @@ class Protein(Base):
     __tablename__ = "protein"  # this is the name that will be used in SQLite
 
     # Define Protein table columns using Declarative:
-    prot_id: Mapped[Optional[int]] = mapped_column(
+    prot_id: Mapped[[int] = mapped_column(
         primary_key=True, autoincrement=True
     )  # Autopopulated ID for local table
-    prot_accession: Mapped[Optional[str]] = mapped_column(
+    prot_accession: Mapped[str] = mapped_column(
         nullable=False, unique=True
     )  # A unique accession number, must be present
-    prot_seq: Mapped[Optional[str]] = mapped_column(nullable=False, unique=True)
+    prot_seq: Mapped[str] = mapped_column(nullable=False, unique=True)
     is_canonical: Mapped[Optional[bool]] = mapped_column(
         default=True
     )  # True/False flag for whether this protein is canonical
@@ -470,7 +470,7 @@ class Interaction(Base):
         nullable=False
     )  # Type of interaction (e.g: electrostatic, hydrophobic, etc)
 
-    interact_description: Mapped[Optional[str]] = mapped_column(
+    interact_description: Mapped[str] = mapped_column(
         nullable=True
     )  # Description of the interaction
 
@@ -493,7 +493,7 @@ class Ppi(Base):
     
     # Define table content:
     ppi_id: Mapped[int] = mapped_column(primary_key=True, unique=True, autoincrement=True)
-    interact_id: Mapped[int] = mapped_column(
+    interact_id: Mapped[optional[int]] = mapped_column(
         ForeignKey("interaction.interact_id"),
     )
     prot_id_1: Mapped[int] = mapped_column(
