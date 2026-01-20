@@ -41,7 +41,10 @@ from file_and_data import link_db_csv
     default=False,
 )
 def main(dbpath: Path, csvpath: Path, force: bool, verbose: bool):
-    print(dbpath)
+    """Main function to create the database and link data from CSV file."""
+    
+    dbpath = dbpath.resolve()
+    
     """Main function to run the script."""
     # Create the database if it doesn't exist, or we're forcing overwrite
     if force is True and dbpath.exists():  # overwrite database
@@ -49,11 +52,16 @@ def main(dbpath: Path, csvpath: Path, force: bool, verbose: bool):
     elif dbpath.exists():
         print(f"Not overwriting {dbpath} (exiting)")
         sys.exit(0)
-    create_db(dbpath)
-    session = get_session(dbpath)
+    
+    #Build database URL:
+    db_url = f"sqlite:///{dbpath.as_posix()}"
+    print(f"Using database: {db_url}", dbpath)
+    #Create db and session
+    create_db(db_url)
+    session = get_session(db_url)
 
     # Read CSV file to import data
-    # print(f"{csvpath=}")
+    print(f"{csvpath=}")
     data = read_file(csvpath, verbose)
 
     # Link the data from the CSV file to the database

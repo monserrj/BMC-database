@@ -11,10 +11,10 @@ For exiting system for trouble shooting import sys
 
 from db import (
     protein_addition,
-    name_addition,
-    cds_addition,
-    xref_addition,
-    xdatabase_addition,
+    #name_addition,
+    #cds_addition,
+    #xref_addition,
+    #xdatabase_addition,
 )
 
 
@@ -35,7 +35,7 @@ def link_db_csv(mydata, session):
             protseq,
             protacc,
             struct,
-            iscan,
+            canonical,
             protname,
             # external dbs come next in sets of 4 (dbname, url, acc, type)
             *db_refs,
@@ -50,10 +50,10 @@ def link_db_csv(mydata, session):
                 protseq=protseq,
                 protacc=protacc,
                 struct=struct,
-                iscan=iscan,
+                canonical=canonical,
             )
             print(f"\nProtein record returned: {protein}")
-
+            
             # gene = cds_addition(
             #     session,
             #     cdstype=cdstype,

@@ -50,7 +50,8 @@ class Base(DeclarativeBase):
 
     pass
 
-
+# Move logger here, so it is consistent across modules and avoid accidental root logger use
+logger = logging.getLogger(__name__)
 Session = sessionmaker()  # We also need a Session object for database connections
 
 
@@ -535,76 +536,89 @@ class Ppi_complex(Base):
 """ Functions to add data to the database"""
 
 # # Function for protein data addition
-# def protein_addition(session, protaccession, protseq, struct, canonical):
+def protein_addition(session, protacc, protseq, struct, canonical):
 
-#     '''
-#     Args:
-#     protseq (str): Protein sequence.
-#     protaccession (str): Protein unique accession number
-#     struct (str): Protein structure type.
-#     canonical (boolean): Canonical if true, false if isoform
+    '''
+    Args:
+    protseq (str): Protein sequence.
+    protacc (str): Protein unique accession number
+    struct (str): Protein structure type.
+    canonical (boolean): Canonical if true, false if isoform
 
-#     Explanation on how the code works:
-#     1. If the protein already exists, store it in the `protein` variable
-#     2. If the protein does not exist, create a new protein object and add it to
-#        the session
-#     3. Commit the session to the database
+    Explanation on how the code works:
+    1. If the protein already exists, store it in the `protein` variable
+    2. If the protein does not exist, create a new protein object and add it to
+    the session
+    3. Commit the session to the database
 
-#     NOTE: SQLAlchemy will autoflush the session when we query the database, so we
-#           do not need to manually flush the session before committing
-#           (https://docs.sqlalchemy.org/en/20/orm/session_basics.html#session-flushing)
-#            This will also automatically commit the session if no exceptions are
-#           raised but, if errors are raised, we will need to rollback the session
-#           and continue to the next entry.
-#     '''
+    NOTE: SQLAlchemy will autoflush the session when we query the database, so we
+        do not need to manually flush the session before committing
+        (https://docs.sqlalchemy.org/en/20/orm/session_basics.html#session-flushing)
+           This will also automatically commit the session if no exceptions are
+        raised but, if errors are raised, we will need to rollback the session
+        and continue to the next entry.
+    '''
+    logger.debug(f"\nNow in {protein_addition.__name__}")
 
-#     print(f"\nNow in {protein_addition.__name__}")
+    print(
+        f"Before query, {protseq[:10]=}..., {protacc=}, {struct=}, {canonical=}"
+    )
 
-#     print(
-#         f"Before query, {protseq[:10]=}..., {protaccession=}, {struct=}, {canonical=}"
-#     )
+    
 
-# Check and convert xtype
-# if isinstance(xtype, str):
-#     try:
-#         xtype = enum_from_str(StructProtType, xtype)
-#     except ValueError as e:
-#         print(f"Invalid protein type: {xtype!r} — {e}")
-#         return None
+    # Create a new protein object
+    try:
+        protein = (
+            session.query(Protein)
+            .filter(Protein.prot_seq == protseq)
+            .first()
+        )
+        print(f"After query, {protein=}")
 
-#     # Create a new protein object
-#     protein = (
-#         session.query(Protein)
-#         .filter(Protein.prot_seq == protseq)
-#         .filter(Protein.prot_accession == protaccession) # Do I need this?
-#         .first()
-#     )
-#     print(f"After query, {protein=}")
+        # Validate protein type
+        if isinstance(xtype, str):
+            try:
+                xtype = enum_from_str(StructProtType, xtype)
+                logger.debug(f"Converted struct to Enum: {xtype}")
+                
+            except ValueError as exc:
+                logger.warning("Skipping invalid struct type: %s — %s", xtype, exc)
+                
+                return None
+        elif not isinstance(xtype, StructProtType):
+            logger.warning(
+                "xtype must be a string or StructProtType, got %s", type(xtype)
+            )
+            return None
+        if protein:
+            logger.info(
+                "Protein already exists: accession=%s id=%s",
+                protacc,
+                protein.prot_id,
+            )
+        # Add protein if it is not already present
+        if not protein:
+            protein = Protein(
+                prot_seq=protseq,
+                prot_accession=protacc,
+                struct_prot_type=struct,
+                is_canonical=canonical,
+            )
+            session.add(protein)
+            session.flush()  # This sends the changes to the database, so prot_id is assigned
+            logger.info(
+                "Protein %s added with accession %s",
+                protein.prot_id,
+                protacc,
+            )
+            return protein
+    except Exception:
+        logger.exception(
+            "Failed to add protein accession=%s", protacc
+        )
+        session.rollback()
+        raise
 
-#     # Add protein if it is not already present
-#     if not protein:
-#         protein = Protein(
-#             prot_seq=protseq,
-#             prot_accession=protaccession,
-#             struct_prot_type=struct,
-#             is_canonical=canonical,
-#         )
-#         session.add(protein)
-#         session.flush()  # This sends the changes to the database, so prot_id is assigned
-#     else:
-#         print(f"Protein with accession number {protaccession} already exists")
-
-#     print(f"Protein row returned: {protein}")
-
-#     # except Exception as exc:
-#     #     print(f"Error committing protein/gene combination: {exc}")
-#     #     print("Rolling back changes and skipping to next entry\n")
-#     #     session.rollback()
-#     # Rollback makes it that when there is a "fail",
-#     # like not unique uniprot reference, its "forgets" the error and keeps going.
-#     return (
-#         protein  # Return the protein row we just added to the db
-#     )
 
 # # Function for Xdatabase data addition
 # def xdatabase_addition(session, xname, href, xtype):
@@ -854,23 +868,36 @@ class Ppi_complex(Base):
 
 
 # Function to create the database and tables
-def create_db(dbpath: Path):
+def create_db(dbpath):
     """Function to create all the tables from the database"""
     # Create a database engine to connect to the database.
     # This creates a new empty database file called bmc.db in the current directory.
-    logger = logging.getLogger(__name__)
-
-    db_URL = f"sqlite:///{dbpath}"
+    
+    logger.info("Initialising database")
+    
+    dbpath = Path(dbpath).resolve()  # ensure it is a Path object
+    dbpath.parent.mkdir(parents=True, exist_ok=True)  # make sure folder exists
+    
+    db_URL = f"sqlite:///{dbpath.as_posix()}"
 
     logger.debug("Binding to session at %s", db_URL)
     engine = create_engine(db_URL)
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database and tables created successfully")
+    
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database and tables created successfully")
+    
+    except Exception as exc:
+        logger.error("Error creating database: %s", exc)
+        raise
 
 
 # Function to get a live session to the database
-def get_session(dbpath: Path):
+def get_session(dbpath):
     """Returns live session to database."""
+    logger.debug("Opening database session for %s", dbpath)
+    dbpath = Path(dbpath).resolve()  # ensure it is a Path object
+    db_URL = f"sqlite:///{dbpath.as_posix()}"
     engine = create_engine(db_URL)
     Session.configure(bind=engine)
     return Session()
@@ -894,8 +921,6 @@ if __name__ == "__main__":
     termhandler = logging.StreamHandler(sys.stdout)
     termhandler.setFormatter(logformatter)
     logger.addHandler(termhandler)
-
-    logger.debug("I'm doing something - 1")
 
     # Path to output database
     outdbpath = Path("db.sqlite3")
