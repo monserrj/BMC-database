@@ -84,6 +84,9 @@ class Protein(Base):
     is_canonical: Mapped[Optional[bool]] = mapped_column(
         default=True
     )  # True/False flag for whether this protein is canonical
+    struct_prot_type: Mapped[Optional[str]] = mapped_column(
+        nullable=True
+    )  # Protein structure type (e.g., predicted, experimental, modelled)
     #    struct_prot_type = Column(SQLEnum(StructProtType, name="struct_prot_type_enum"))  # Not currently defined
 
     # Define relationships to other tables in Declarative
@@ -131,8 +134,7 @@ class Xdatabase(Base):
     #    xref_type = Column(SQLEnum(DatabaseType, name ="database_type_enum", nullable=False))   # Not currently defined
 
     # Define relationships using Declarative
-    xref: Mapped["Xref"] = relationship(back_populates="xref_db")
-    databases: Mapped[list["Xref"]] = relationship()
+    xref: Mapped[list["Xref"]] = relationship(back_populates="xref_db")
 
 
 class Xref(Base):  # All external references
@@ -151,7 +153,7 @@ class Xref(Base):  # All external references
     )
 
     # Define relationships using Declarative
-    xref_db: Mapped["Xdatabase"] = relationship(back_populates="databases")
+    xref_db: Mapped["Xdatabase"] = relationship(back_populates="xref")
     proteins: Mapped["ProteinXref"] = relationship(back_populates="xref")
     cdss: Mapped["CdsXref"] = relationship(back_populates="x_ref")
 
@@ -604,7 +606,7 @@ def protein_addition(session, protacc, protseq, struct, canonical):
             protein = Protein(
                 prot_seq=protseq,
                 prot_accession=protacc,
-                #struct_prot_type=struct,
+                struct_prot_type=struct,
                 is_canonical=canonical,
             )
             session.add(protein)

@@ -17,6 +17,13 @@ from db import (
     #xdatabase_addition,
 )
 
+# To make boolean values from the csv true booleans:
+def parse_bool(value):
+    """Convert CSV boolean-like values to Python bool."""
+    if isinstance(value, bool):
+        return value  # already boolean
+    # Accept TRUE/FALSE (case-insensitive) or yes/no
+    return str(value).strip().lower() in ("true", "yes")
 
 # Making a function for the addition of data to the different tables created with db.py following data_instructions:
 def link_db_csv(mydata, session):
@@ -42,6 +49,8 @@ def link_db_csv(mydata, session):
         ) = row
         # Check what data is available:
         print(f"\nStarting next loop ({idx=}) with {protacc=}")
+        # Convert canonical to boolean
+        canonical = parse_bool(canonical)
 
         try:  # attempt to add to db, if we raise an error, we roll back
             # Add protein data
@@ -64,30 +73,30 @@ def link_db_csv(mydata, session):
             # print(f"\nGene record returned: {gene}")
 
             # Add name data
-            name = name_addition(session, protname=protname, protein=protein)
+            # name = name_addition(session, protname=protname, protein=protein)
 
-            print(f"\nProtein record returned: {protein}")
-            print(f"Name record returned: {name}")
+            # print(f"\nProtein record returned: {protein}")
+            # print(f"Name record returned: {name}")
 
             # Add external reference data
             # Handle external DB refs
             # They come in groups of 4: db, url, acc, type
-            for i in range(0, len(db_refs), 4):
-                dbname, dburl, accessionid, dbtype = db_refs[i : i + 4]
+        #     for i in range(0, len(db_refs), 4):
+        #         dbname, dburl, accessionid, dbtype = db_refs[i : i + 4]
 
-                # skip empty slots if some rows don’t have all 7 filled
-                if not any([dbname, dburl, accessionid, dbtype]):
-                    continue
+        #         # skip empty slots if some rows don’t have all 7 filled
+        #         if not any([dbname, dburl, accessionid, dbtype]):
+        #             continue
 
-                xref = xref_addition(
-                    session,
-                    accessionid=accessionid,
-                    dbname=dbname,
-                    dburl=dburl,
-                    protein=protein,
-                )
-            print(f"\nProtein record returned: {protein}")
-            print(f"Name record returned: {xref}")
+        #         xref = xref_addition(
+        #             session,
+        #             accessionid=accessionid,
+        #             dbname=dbname,
+        #             dburl=dburl,
+        #             protein=protein,
+        #         )
+        #     print(f"\nProtein record returned: {protein}")
+        #     print(f"Name record returned: {xref}")
 
         except Exception as exc:
             print(f"Error adding data: {exc}")

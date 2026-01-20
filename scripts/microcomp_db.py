@@ -49,6 +49,7 @@ def main(dbpath: Path, csvpath: Path, force: bool, verbose: bool):
     # Create the database if it doesn't exist, or we're forcing overwrite
     if force is True and dbpath.exists():  # overwrite database
         print(f"Overwriting {dbpath}")
+        dbpath.unlink()  # Delete the old database file
     elif dbpath.exists():
         print(f"Not overwriting {dbpath} (exiting)")
         sys.exit(0)
@@ -57,8 +58,8 @@ def main(dbpath: Path, csvpath: Path, force: bool, verbose: bool):
     db_url = f"sqlite:///{dbpath.as_posix()}"
     print(f"Using database: {db_url}", dbpath)
     #Create db and session
-    create_db(db_url)
-    session = get_session(db_url)
+    create_db(dbpath)  # Pass Path object, not URL string
+    session = get_session(dbpath)  # Pass Path object, not URL string
 
     # Read CSV file to import data
     print(f"{csvpath=}")
