@@ -90,14 +90,16 @@ class Protein(Base):
     references: Mapped["ProteinXref"] = relationship(back_populates="protein")
     cds: Mapped["Cds"] = relationship(back_populates="protein")
     names: Mapped["ProteinName"] = relationship(back_populates="protein")
-    isoforms: Mapped["Isoforms"] = relationship(back_populates="isoform")
-    canonicals: Mapped["Isoforms"] = relationship(back_populates="canonical")
+    isoforms: Mapped["Isoforms"] = relationship(back_populates="isoform", foreign_keys="[Isoforms.isoform__prot_id]")
+    canonicals: Mapped["Isoforms"] = relationship(back_populates="canonical", foreign_keys="[Isoforms.canonical__prot_id]")
     complexes: Mapped["ProteinComplex"] = relationship(back_populates="protein")
     interaction_1: Mapped["Ppi"] = relationship(
-        back_populates="protein_1"
+        back_populates="protein_1",
+        foreign_keys="[Ppi.prot_id_1]",
     )
     interaction_2: Mapped["Ppi"] = relationship(
-        back_populates="protein_2"
+        back_populates="protein_2",
+        foreign_keys="[Ppi.prot_id_2]",
     )
 
     # Define string representation of protein row
@@ -129,7 +131,7 @@ class Xdatabase(Base):
     #    xref_type = Column(SQLEnum(DatabaseType, name ="database_type_enum", nullable=False))   # Not currently defined
 
     # Define relationships using Declarative
-    xref: Mapped["Xref"] = relationship(back_populates="xref_db_id")
+    xref: Mapped["Xref"] = relationship(back_populates="xref_db")
     databases: Mapped[list["Xref"]] = relationship()
 
 
@@ -151,7 +153,7 @@ class Xref(Base):  # All external references
     # Define relationships using Declarative
     xref_db: Mapped["Xdatabase"] = relationship(back_populates="databases")
     proteins: Mapped["ProteinXref"] = relationship(back_populates="xref")
-    cdss: Mapped["CdsXref"] = relationship(back_populates="cds")
+    cdss: Mapped["CdsXref"] = relationship(back_populates="x_ref")
 
 
 class ProteinXref(Base):
@@ -201,9 +203,9 @@ class Cds(Base):
 
     # Introduce all relationship between tables: Check this?
     protein: Mapped["Protein"] = relationship(back_populates="cds")
-    origins: Mapped["Origin"] = relationship(back_populates="origin")
-    cdss: Mapped["Origin"] = relationship(back_populates="cds")
-    references: Mapped["CdsXref"] = relationship(back_populates="cds_xref")
+    origins: Mapped["Origin"] = relationship(back_populates="origin", foreign_keys="[Origin.origin_id]")
+    modifieds: Mapped["Origin"] = relationship(back_populates="modified", foreign_keys="[Origin.modified_id]")
+    references: Mapped["CdsXref"] = relationship(back_populates="cds")
     modifications: Mapped["CdsModification"] = relationship(back_populates="cds")
 
 
@@ -217,19 +219,19 @@ class Origin(Base):
     """
 
     __tablename__ = "origin"
-    __table_args__ = (PrimaryKeyConstraint("origin_id", "cds_id"),)
+    __table_args__ = (PrimaryKeyConstraint("origin_id", "modified_id"),)
 
     # Define table content:
     origin_id: Mapped[int] = mapped_column(
         ForeignKey("cds.cds_id"), nullable=False
     )  # Foreign key, original CDS sequence (cds_id key)
-    cds_id: Mapped[int] = mapped_column(
+    modified_id: Mapped[int] = mapped_column(
         ForeignKey("cds.cds_id"), nullable=False
     )  # Foreign key, modified CDS sequence (cds_id key)
 
     # Introduce all relationship between tables:
-    cds: Mapped["Cds"] = relationship(back_populates="cds")
-    origin: Mapped["Cds"] = relationship(back_populates="origins")
+    modified: Mapped["Cds"] = relationship("Cds", back_populates="modifieds", foreign_keys=[modified_id])
+    origin: Mapped["Cds"] = relationship("Cds", back_populates="origins", foreign_keys=[origin_id])
 
 
 class CdsXref(Base):
@@ -376,8 +378,8 @@ class Isoforms(Base):
     )
 
     # Introduce all relationship between tables:
-    isoform: Mapped["Protein"] = relationship(back_populates="isoforms")
-    canonical: Mapped["Protein"] = relationship(back_populates="canonicals")
+    isoform: Mapped["Protein"] = relationship("Protein", back_populates="isoforms", foreign_keys=[isoform__prot_id])
+    canonical: Mapped["Protein"] = relationship("Protein", back_populates="canonicals",  foreign_keys=[canonical__prot_id])
 
 
 class Complex(Base):
@@ -410,11 +412,12 @@ class Complex(Base):
     # Introduce all relationship between tables:
     proteins: Mapped["ProteinComplex"] = relationship(
         "ProteinComplex",
-        secondary="protein_complex",
-        back_populates="complexes",
-        lazy="dynamic",
+        back_populates="complex",
     )
-
+    interactions: Mapped["Ppi_complex"] = relationship(
+        "Ppi_complex",
+        back_populates="complex",
+    )
 
 class ProteinComplex(Base):
     """Each row describes a unique protein-complex relationship.
@@ -505,10 +508,10 @@ class Ppi(Base):
     )
 
     # Introduce all relationship between tables:
-    interaction: Mapped["Ppi_complex"] = relationship(back_populates="ppis")
-    protein_1: Mapped["Protein"] = relationship(back_populates="interaction_1")
-    protein_2: Mapped["Protein"] = relationship(back_populates="interaction_2")
-    interaction: Mapped["Interaction"] = relationship(back_populates="interactions")
+    complex: Mapped["Ppi_complex"] = relationship(back_populates="ppi")
+    protein_1: Mapped["Protein"] = relationship("Protein", back_populates="interaction_1", foreign_keys=[prot_id_1])
+    protein_2: Mapped["Protein"] = relationship("Protein", back_populates="interaction_2", foreign_keys=[prot_id_2])
+    interaction: Mapped["Interaction"] = relationship(back_populates="ppis")
 
 class Ppi_complex(Base):
     """Each row describes a unique protein-protein interaction associated to a complex.
@@ -531,8 +534,8 @@ class Ppi_complex(Base):
     )
 
     # Introduce all relationship between tables:
-    ppi: Mapped["Ppi"] = relationship(back_populates="ppis")
-    complex: Mapped["Complex"] = relationship(back_populates="proteins")
+    ppi: Mapped["Ppi"] = relationship(back_populates="complex")
+    complex: Mapped["Complex"] = relationship(back_populates="interactions")
 """ Functions to add data to the database"""
 
 # # Function for protein data addition
@@ -575,21 +578,21 @@ def protein_addition(session, protacc, protseq, struct, canonical):
         )
         print(f"After query, {protein=}")
 
-        # Validate protein type
-        if isinstance(xtype, str):
-            try:
-                xtype = enum_from_str(StructProtType, xtype)
-                logger.debug(f"Converted struct to Enum: {xtype}")
+        # # Validate protein type
+        # if isinstance(xtype, str):
+        #     try:
+        #         xtype = enum_from_str(StructProtType, xtype)
+        #         logger.debug(f"Converted struct to Enum: {xtype}")
                 
-            except ValueError as exc:
-                logger.warning("Skipping invalid struct type: %s — %s", xtype, exc)
+        #     except ValueError as exc:
+        #         logger.warning("Skipping invalid struct type: %s — %s", xtype, exc)
                 
-                return None
-        elif not isinstance(xtype, StructProtType):
-            logger.warning(
-                "xtype must be a string or StructProtType, got %s", type(xtype)
-            )
-            return None
+        #         return None
+        # elif not isinstance(xtype, StructProtType):
+        #     logger.warning(
+        #         "xtype must be a string or StructProtType, got %s", type(xtype)
+        #     )
+        #     return None
         if protein:
             logger.info(
                 "Protein already exists: accession=%s id=%s",
@@ -601,7 +604,7 @@ def protein_addition(session, protacc, protseq, struct, canonical):
             protein = Protein(
                 prot_seq=protseq,
                 prot_accession=protacc,
-                struct_prot_type=struct,
+                #struct_prot_type=struct,
                 is_canonical=canonical,
             )
             session.add(protein)
