@@ -97,6 +97,10 @@ def link_db_csv(mydata, session):
         #         )
         #     print(f"\nProtein record returned: {protein}")
         #     print(f"Name record returned: {xref}")
+            
+            # Commit the transaction after successful addition
+            print("Committing the session")
+            session.commit()
 
         except Exception as exc:
             print(f"Error adding data: {exc}")
