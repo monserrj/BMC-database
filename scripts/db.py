@@ -11,19 +11,16 @@ the process."""
 import logging  # We'll use this to report program state and other things to the user
 import sys
 
-from enum import (
-    Enum,
-)  # To create enumerations for some of the vocabulary restricted fields
 from pathlib import Path  # for type hints
 from typing import Optional
 
 from enums import DatabaseType, StructProtType, enum_from_str
 
 # Import  SQLAlchemy classes needed with a declarative approach.
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy import (
     Boolean,
     Column,
+    Enum,
     Integer,
     String,
     ForeignKey,
@@ -31,14 +28,15 @@ from sqlalchemy import (
     UniqueConstraint,
     String,
     or_,
-)
-from sqlalchemy.orm import DeclarativeBase, relationship, Mapped, mapped_column
-from sqlalchemy.orm import (
-    sessionmaker,
-)  # Import a sessionmaker to create a session object
-from sqlalchemy import (
     create_engine,
-)  # Create_engine function to create an engine object
+)
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    relationship,
+    Mapped,
+    mapped_column,
+    sessionmaker,
+)
 
 #######################################################
 # (2) Generic SQLAlchemy configuration
@@ -49,6 +47,7 @@ class Base(DeclarativeBase):
     """Declarative base class"""
 
     pass
+
 
 # Move logger here, so it is consistent across modules and avoid accidental root logger use
 logger = logging.getLogger(__name__)
@@ -84,17 +83,18 @@ class Protein(Base):
     is_canonical: Mapped[Optional[bool]] = mapped_column(
         default=True
     )  # True/False flag for whether this protein is canonical
-    struct_prot_type: Mapped[Optional[str]] = mapped_column(
-        nullable=True
-    )  # Protein structure type (e.g., predicted, experimental, modelled)
-    #    struct_prot_type = Column(SQLEnum(StructProtType, name="struct_prot_type_enum"))  # Not currently defined
+    struct_prot_type: Mapped[Optional[Enum]] = Column(Enum(StructProtType))
 
     # Define relationships to other tables in Declarative
     references: Mapped["ProteinXref"] = relationship(back_populates="protein")
     cds: Mapped["Cds"] = relationship(back_populates="protein")
     names: Mapped["ProteinName"] = relationship(back_populates="protein")
-    isoforms: Mapped["Isoforms"] = relationship(back_populates="isoform", foreign_keys="[Isoforms.isoform__prot_id]")
-    canonicals: Mapped["Isoforms"] = relationship(back_populates="canonical", foreign_keys="[Isoforms.canonical__prot_id]")
+    isoforms: Mapped["Isoforms"] = relationship(
+        back_populates="isoform", foreign_keys="[Isoforms.isoform__prot_id]"
+    )
+    canonicals: Mapped["Isoforms"] = relationship(
+        back_populates="canonical", foreign_keys="[Isoforms.canonical__prot_id]"
+    )
     complexes: Mapped["ProteinComplex"] = relationship(back_populates="protein")
     interaction_1: Mapped["Ppi"] = relationship(
         back_populates="protein_1",
@@ -205,8 +205,12 @@ class Cds(Base):
 
     # Introduce all relationship between tables: Check this?
     protein: Mapped["Protein"] = relationship(back_populates="cds")
-    origins: Mapped["Origin"] = relationship(back_populates="origin", foreign_keys="[Origin.origin_id]")
-    modifieds: Mapped["Origin"] = relationship(back_populates="modified", foreign_keys="[Origin.modified_id]")
+    origins: Mapped["Origin"] = relationship(
+        back_populates="origin", foreign_keys="[Origin.origin_id]"
+    )
+    modifieds: Mapped["Origin"] = relationship(
+        back_populates="modified", foreign_keys="[Origin.modified_id]"
+    )
     references: Mapped["CdsXref"] = relationship(back_populates="cds")
     modifications: Mapped["CdsModification"] = relationship(back_populates="cds")
 
@@ -232,8 +236,12 @@ class Origin(Base):
     )  # Foreign key, modified CDS sequence (cds_id key)
 
     # Introduce all relationship between tables:
-    modified: Mapped["Cds"] = relationship("Cds", back_populates="modifieds", foreign_keys=[modified_id])
-    origin: Mapped["Cds"] = relationship("Cds", back_populates="origins", foreign_keys=[origin_id])
+    modified: Mapped["Cds"] = relationship(
+        "Cds", back_populates="modifieds", foreign_keys=[modified_id]
+    )
+    origin: Mapped["Cds"] = relationship(
+        "Cds", back_populates="origins", foreign_keys=[origin_id]
+    )
 
 
 class CdsXref(Base):
@@ -380,8 +388,12 @@ class Isoforms(Base):
     )
 
     # Introduce all relationship between tables:
-    isoform: Mapped["Protein"] = relationship("Protein", back_populates="isoforms", foreign_keys=[isoform__prot_id])
-    canonical: Mapped["Protein"] = relationship("Protein", back_populates="canonicals",  foreign_keys=[canonical__prot_id])
+    isoform: Mapped["Protein"] = relationship(
+        "Protein", back_populates="isoforms", foreign_keys=[isoform__prot_id]
+    )
+    canonical: Mapped["Protein"] = relationship(
+        "Protein", back_populates="canonicals", foreign_keys=[canonical__prot_id]
+    )
 
 
 class Complex(Base):
@@ -420,6 +432,7 @@ class Complex(Base):
         "Ppi_complex",
         back_populates="complex",
     )
+
 
 class ProteinComplex(Base):
     """Each row describes a unique protein-complex relationship.
@@ -496,9 +509,11 @@ class Ppi(Base):
     """
 
     __tablename__ = "Ppi"
-    
+
     # Define table content:
-    ppi_id: Mapped[int] = mapped_column(primary_key=True, unique=True, autoincrement=True)
+    ppi_id: Mapped[int] = mapped_column(
+        primary_key=True, unique=True, autoincrement=True
+    )
     interact_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("interaction.interact_id"),
     )
@@ -511,9 +526,14 @@ class Ppi(Base):
 
     # Introduce all relationship between tables:
     complex: Mapped["Ppi_complex"] = relationship(back_populates="ppi")
-    protein_1: Mapped["Protein"] = relationship("Protein", back_populates="interaction_1", foreign_keys=[prot_id_1])
-    protein_2: Mapped["Protein"] = relationship("Protein", back_populates="interaction_2", foreign_keys=[prot_id_2])
+    protein_1: Mapped["Protein"] = relationship(
+        "Protein", back_populates="interaction_1", foreign_keys=[prot_id_1]
+    )
+    protein_2: Mapped["Protein"] = relationship(
+        "Protein", back_populates="interaction_2", foreign_keys=[prot_id_2]
+    )
     interaction: Mapped["Interaction"] = relationship(back_populates="ppis")
+
 
 class Ppi_complex(Base):
     """Each row describes a unique protein-protein interaction associated to a complex.
@@ -538,12 +558,14 @@ class Ppi_complex(Base):
     # Introduce all relationship between tables:
     ppi: Mapped["Ppi"] = relationship(back_populates="complex")
     complex: Mapped["Complex"] = relationship(back_populates="interactions")
+
+
 """ Functions to add data to the database"""
+
 
 # # Function for protein data addition
 def protein_addition(session, protacc, protseq, struct, canonical):
-
-    '''
+    """
     Args:
     protseq (str): Protein sequence.
     protacc (str): Protein unique accession number
@@ -559,42 +581,27 @@ def protein_addition(session, protacc, protseq, struct, canonical):
     NOTE: SQLAlchemy will autoflush the session when we query the database, so we
         do not need to manually flush the session before committing
         (https://docs.sqlalchemy.org/en/20/orm/session_basics.html#session-flushing)
-           This will also automatically commit the session if no exceptions are
+    This will also automatically commit the session if no exceptions are
         raised but, if errors are raised, we will need to rollback the session
         and continue to the next entry.
-    '''
+    """
     logger.debug(f"\nNow in {protein_addition.__name__}")
 
-    print(
-        f"Before query, {protseq[:10]=}..., {protacc=}, {struct=}, {canonical=}"
-    )
-
-    
+    print(f"Before query, {protseq[:10]=}..., {protacc=}, {struct=}, {canonical=}")
 
     # Create a new protein object
     try:
-        protein = (
-            session.query(Protein)
-            .filter(Protein.prot_seq == protseq)
-            .first()
-        )
+        protein = session.query(Protein).filter(Protein.prot_seq == protseq).first()
         print(f"After query, {protein=}")
 
-        # # Validate protein type
-        # if isinstance(xtype, str):
-        #     try:
-        #         xtype = enum_from_str(StructProtType, xtype)
-        #         logger.debug(f"Converted struct to Enum: {xtype}")
-                
-        #     except ValueError as exc:
-        #         logger.warning("Skipping invalid struct type: %s — %s", xtype, exc)
-                
-        #         return None
-        # elif not isinstance(xtype, StructProtType):
-        #     logger.warning(
-        #         "xtype must be a string or StructProtType, got %s", type(xtype)
-        #     )
-        #     return None
+        # Enforce protein structure type
+        if struct not in StructProtType:  # invalid protein structure type
+            logger.warning(
+                "Skipping invalid struct type: %s (accession: %s)", struct, protacc
+            )
+        else:
+            struct = StructProtType[struct]
+
         if protein:
             logger.info(
                 "Protein already exists: accession=%s id=%s",
@@ -618,9 +625,7 @@ def protein_addition(session, protacc, protseq, struct, canonical):
             )
             return protein
     except Exception:
-        logger.exception(
-            "Failed to add protein accession=%s", protacc
-        )
+        logger.exception("Failed to add protein accession=%s", protacc)
         session.rollback()
         raise
 
@@ -877,21 +882,21 @@ def create_db(dbpath):
     """Function to create all the tables from the database"""
     # Create a database engine to connect to the database.
     # This creates a new empty database file called bmc.db in the current directory.
-    
+
     logger.info("Initialising database")
-    
+
     dbpath = Path(dbpath).resolve()  # ensure it is a Path object
     dbpath.parent.mkdir(parents=True, exist_ok=True)  # make sure folder exists
-    
+
     db_URL = f"sqlite:///{dbpath.as_posix()}"
 
     logger.debug("Binding to session at %s", db_URL)
     engine = create_engine(db_URL)
-    
+
     try:
         Base.metadata.create_all(bind=engine)
         logger.info("Database and tables created successfully")
-    
+
     except Exception as exc:
         logger.error("Error creating database: %s", exc)
         raise
