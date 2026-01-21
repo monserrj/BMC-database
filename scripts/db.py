@@ -595,12 +595,12 @@ def protein_addition(session, protacc, protseq, struct, canonical):
         print(f"After query, {protein=}")
 
         # Enforce protein structure type
-        if struct not in StructProtType:  # invalid protein structure type
+        if struct.upper() not in StructProtType:  # invalid protein structure type
             logger.warning(
                 "Skipping invalid struct type: %s (accession: %s)", struct, protacc
             )
         else:
-            struct = StructProtType[struct]
+            struct = StructProtType[struct.upper()]
 
         if protein:
             logger.info(
