@@ -624,8 +624,9 @@ def protein_addition(session, protacc, protseq, struct, canonical):
                 protacc,
             )
             return protein
-    except Exception:
+    except Exception as exc:
         logger.exception("Failed to add protein accession=%s", protacc)
+        logger.exception(exc)
         session.rollback()
         raise
 
