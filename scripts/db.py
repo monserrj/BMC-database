@@ -205,17 +205,17 @@ class Cds(Base):
 
     # Introduce all relationship between tables: Check this?
     protein: Mapped["Protein"] = relationship(back_populates="cds")
-    origins: Mapped["Origin"] = relationship(
-        back_populates="origin", foreign_keys="[Origin.origin_id]"
+    origins: Mapped["Origin_cds"] = relationship(
+        back_populates="origin", foreign_keys="[Origin_cds.origin_id]"
     )
-    modifieds: Mapped["Origin"] = relationship(
-        back_populates="modified", foreign_keys="[Origin.modified_id]"
+    modifieds: Mapped["Origin_cds"] = relationship(
+        back_populates="modified", foreign_keys="[Origin_cds.modified_id]"
     )
     references: Mapped["CdsXref"] = relationship(back_populates="cds")
     modifications: Mapped["CdsModification"] = relationship(back_populates="cds")
 
 
-class Origin(Base):
+class Origin_cds(Base):
     """Each row describes the link between original and modified CDS.
 
     The table stores
@@ -224,7 +224,7 @@ class Origin(Base):
     - the corresponding modified CDS id.
     """
 
-    __tablename__ = "origin"
+    __tablename__ = "origin_cds"
     __table_args__ = (PrimaryKeyConstraint("origin_id", "modified_id"),)
 
     # Define table content:
