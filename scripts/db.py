@@ -563,8 +563,8 @@ class Ppi_complex(Base):
 """ Functions to add data to the database"""
 
 
-# # Function for protein data addition
-def protein_addition(session, protacc, protseq, struct, canonical):
+# # Function to add protein data
+def add_protein(session, protacc, protseq, struct, canonical):
     """
     Args:
     protseq (str): Protein sequence.
@@ -585,7 +585,7 @@ def protein_addition(session, protacc, protseq, struct, canonical):
         raised but, if errors are raised, we will need to rollback the session
         and continue to the next entry.
     """
-    logger.debug(f"\nNow in {protein_addition.__name__}")
+    logger.debug(f"\nNow in {add_protein.__name__}")
 
     print(f"Before query, {protseq[:10]=}..., {protacc=}, {struct=}, {canonical=}")
 
@@ -631,8 +631,8 @@ def protein_addition(session, protacc, protseq, struct, canonical):
         raise
 
 
-# # Function for Xdatabase data addition
-# def xdatabase_addition(session, xname, href, xtype):
+# # Function to add Xdatabase data 
+# def add_xdatabase(session, xname, href, xtype):
 
 #     ''' Args:
 #     xdb_name (str): Database name.
@@ -646,7 +646,7 @@ def protein_addition(session, protacc, protseq, struct, canonical):
 #     3. Commit the session to the database
 #     '''
 
-#     print(f"\nNow in {xdatabase_addition.__name__}")
+#     print(f"\nNow in {add_xdatabase.__name__}")
 #     print(f"Before query, {xname=}, {href=}, {xtype=}")
 
 # Check and convert xtype
@@ -683,14 +683,14 @@ def protein_addition(session, protacc, protseq, struct, canonical):
 
 #     return xdb  # Return the db row we just added to the db/otherwise dealt with
 
-# # Function for CDS data addition
-# def cds_addition(session, cdsseq, cdsaccession, cdsorigin, protein):
+# # Function to add CDS data
+# def add_cds(session, cdsseq, cdsaccession, cdsorigin, protein):
 
 #     ''' Args:
 #     cdsseq (str): Gene DNA sequence.
 #     cdsaccession: (str) Unique accession number CDS
 #     cds_origin (str): Original CDS sequence if the sequence is modified.
-#     protein: Protein information added with protein_addition function
+#     protein: Protein information added with add_protein function
 
 #     Explanation on how the code works:
 #     1. Check if the cds already exists,  store it in the `cds` variable
@@ -701,7 +701,7 @@ def protein_addition(session, protacc, protseq, struct, canonical):
 #     4. Commit the session to the database
 #     '''
 
-#     print(f"\nNow in {cds_addition.__name__}")
+#     print(f"\nNow in {add_cds.__name__}")
 
 #     print(f"Before query, {cdsseq[:10]=}...,{cdsaccession=} {cdsorigin=}")
 
@@ -734,8 +734,8 @@ def protein_addition(session, protacc, protseq, struct, canonical):
 
 #     return cds  # Return the cds row we just added to the db/otherwise dealt with
 
-# # Function for xref data addition and linking to cds and protein
-# def xref_addition(session, xdb, cds, protein, xrefacc):
+# # Function to add xref data and linking to cds and protein
+# def add_xref(session, xdb, cds, protein, xrefacc):
 
 #     ''' Args:
 #         xdb: Xdatabase ORM object (external DB already added)
@@ -757,7 +757,7 @@ def protein_addition(session, protacc, protseq, struct, canonical):
 #     4. Commit the session to the database
 #     '''
 
-#     print(f"\nNow in {xref_addition.__name__} with {xrefacc=}")
+#     print(f"\nNow in {add_xref.__name__} with {xrefacc=}")
 
 #     print(f"Before query, {xdb=}, {xrefacc=}")
 
@@ -815,12 +815,12 @@ def protein_addition(session, protacc, protseq, struct, canonical):
 
 #     return xref  # Return the renference row we just added to the db/otherwise dealt with
 
-# # Function for name data addition
-# def name_addition(session, protname, protein):
+# # Function to add name data 
+# def add_name(session, protname, protein):
 
 #     ''' Args:
 #     protname (str): Protein name.
-#     protein: Protein information added with protein_addition function
+#     protein: Protein information added with add_protein function
 
 #     Explanation on how the code works:
 #     1. Check if the name already exists,  store it in the `name` variable
@@ -831,7 +831,7 @@ def protein_addition(session, protacc, protseq, struct, canonical):
 #     4. Commit the session to the database
 #     '''
 
-#     print(f"\nNow in {name_addition.__name__}")
+#     print(f"\nNow in {add_name.__name__}")
 
 #     with session.no_autoflush:
 #         print(f"Before query, {protname=}")
