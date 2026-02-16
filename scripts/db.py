@@ -380,10 +380,10 @@ class Isoforms(Base):
     __table_args__ = (PrimaryKeyConstraint("canonical__prot_id", "isoform__prot_id"),)
 
     # Define table content:
-    canonical__prot_id: Mapped[int] = mapped_column(
+    canonical_prot_id: Mapped[int] = mapped_column(
         ForeignKey("protein.prot_id"),
     )
-    isoform__prot_id: Mapped[int] = mapped_column(
+    isoform_prot_id: Mapped[int] = mapped_column(
         ForeignKey("protein.prot_id"),
     )
 
