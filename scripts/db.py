@@ -90,10 +90,10 @@ class Protein(Base):
     cds: Mapped["Cds"] = relationship(back_populates="protein")
     names: Mapped["ProteinName"] = relationship(back_populates="protein")
     isoforms: Mapped["Isoforms"] = relationship(
-        back_populates="isoform", foreign_keys="[Isoforms.isoform__prot_id]"
+        back_populates="isoform", foreign_keys="[Isoforms.isoform_prot_id]"
     )
     canonicals: Mapped["Isoforms"] = relationship(
-        back_populates="canonical", foreign_keys="[Isoforms.canonical__prot_id]"
+        back_populates="canonical", foreign_keys="[Isoforms.canonical_prot_id]"
     )
     complexes: Mapped["ProteinComplex"] = relationship(back_populates="protein")
     interaction_1: Mapped["Ppi"] = relationship(
@@ -377,7 +377,7 @@ class Isoforms(Base):
     """
 
     __tablename__ = "isoforms"
-    __table_args__ = (PrimaryKeyConstraint("canonical__prot_id", "isoform__prot_id"),)
+    __table_args__ = (PrimaryKeyConstraint("canonical_prot_id", "isoform_prot_id"),)
 
     # Define table content:
     canonical_prot_id: Mapped[int] = mapped_column(
@@ -389,10 +389,10 @@ class Isoforms(Base):
 
     # Introduce all relationship between tables:
     isoform: Mapped["Protein"] = relationship(
-        "Protein", back_populates="isoforms", foreign_keys=[isoform__prot_id]
+        "Protein", back_populates="isoforms", foreign_keys=[isoform_prot_id]
     )
     canonical: Mapped["Protein"] = relationship(
-        "Protein", back_populates="canonicals", foreign_keys=[canonical__prot_id]
+        "Protein", back_populates="canonicals", foreign_keys=[canonical_prot_id]
     )
 
 
