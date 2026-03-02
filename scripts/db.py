@@ -14,7 +14,8 @@ import sys
 from pathlib import Path  # for type hints
 from typing import Optional
 
-from enums import DatabaseType, StructProtType, enum_from_str
+
+from enums import DatabaseType, Database, StructProtType, enum_from_str
 
 # Import  SQLAlchemy classes needed with a declarative approach.
 from sqlalchemy import (
@@ -125,16 +126,12 @@ class Xdatabase(Base):
     xref_db_id: Mapped[int] = mapped_column(
         primary_key=True, autoincrement=True
     )  # Local id for database
-    xref_db_name: Mapped[str] = mapped_column(
-        nullable=False, unique=True
-    )  # Database with crossref
-    xref_href: Mapped[str] = mapped_column(
-        nullable=False, unique=True
-    )  # URL to database
-    #    xref_type = Column(SQLEnum(DatabaseType, name ="database_type_enum", nullable=False))   # Not currently defined
+    database : Mapped[Enum] = Column(Enum(Database), nullable=False, unique=True)  # Enum for database name, type and url
 
     # Define relationships using Declarative
     xref: Mapped[list["Xref"]] = relationship(back_populates="xref_db")
+
+
 
 
 class Xref(Base):  # All external references
@@ -587,7 +584,7 @@ def add_protein(session, protacc, protseq, struct, canonical):
     """
     logger.debug(f"\nNow in {add_protein.__name__}")
 
-    print(f"Before query, {protseq[:10]=}..., {protacc=}, {struct=}, {canonical=}")
+    logger.debug(f"Before query, {protseq[:10]=}..., {protacc=}, {struct=}, {canonical=}")
 
     # Create a new protein object
     try:
@@ -631,57 +628,62 @@ def add_protein(session, protacc, protseq, struct, canonical):
         raise
 
 
-# # Function to add Xdatabase data 
-# def add_xdatabase(session, xname, href, xtype):
+# Function to add Xdatabase data 
+# def add_xdatabase(session, database, confirm=True):
 
 #     ''' Args:
-#     xdb_name (str): Database name.
+#     session: SQLAlchemy session to the database
+#     xname (str): Database name.
 #     href (str): Database URL.
-#     xdb_type (str): Database type (sequence, structure, function, taxonomy)
+#     xtype (str): Database type (sequence, structure, function, taxonomy)
+#     confirm (bool): Whether to ask the user to confirm adding a new database type if xtype is not recognised
 
 #     Explanation on how the code works:
 #     1. Check if the database already exists,  store it in the `xdb` variable
-#     2. If the database does not exist, create a new db object and add it to the
-#        session
-#     3. Commit the session to the database
+#     2. If the database does not exist, check that this new database typews added (Y/N) questions
+#     3. If yes, create a new db object and add it to the session
+#     4. Commit the session to the database
 #     '''
 
-#     print(f"\nNow in {add_xdatabase.__name__}")
-#     print(f"Before query, {xname=}, {href=}, {xtype=}")
+#     logger.debug(f"\nNow in {add_xdatabase.__name__}")
+    
+#     logger.debug(f"Before query, {xname=}, {href=}, {xtype=}")
 
-# Check and convert xtype
-# if isinstance(xtype, str):
-#     try:
-#         xtype = enum_from_str(DatabaseType, xtype)
-#     except ValueError as e:
-#         print(f"Invalid database type: {xtype!r} — {e}")
-#         return None
-
-# elif not isinstance(xtype, DatabaseType):
-#     print(f"xtype must be a string or DatabaseType, got {type(xtype)}")
-#     return None
-# print(f"Converted xtype to Enum: {xtype}")
-
-#     # Create a new db object
-#     xdb = (
+# # Check existance by enum
+# xdb = (
 #         session.query(Xdatabase)
-#         .filter(Xdatabase.xref_db_name == xname)
-#         .filter(Xdatabase.xref_href == href)
+#         .filter_by(database=database)
 #         .first()
 #     )
-#     print(f"After query, {xdb=}")
 
-#     # Add db if it is not already present
-#     if not xdb:
-#         xdb = Xdatabase(xref_db_name=xname, xref_href=href, xref_type=xtype)
+#     if xdb:
+#         logger.info("Database %s already exists", database.name)
+#         return xdb
+
+# # Add db if it is not already present
+# if confirm:
+#     response = input(
+#         f"Add new database '{database.label}' ({database.type.value})? [y/N]: "
+#     ).strip().lower()
+
+#     if response not in {"y", "yes"}:
+#         logger.info("User declined insertion")
+#         return None
+
+# # Insert new database
+# try:
+#         xdb = Xdatabase(database=database)
 #         session.add(xdb)
 #         session.flush()
-#         print(f"Database {xname} added")
-#     else:
-#         print(f"This database {xname} has already being added")
-#     print(f"Database row returned: {xdb}")
 
-#     return xdb  # Return the db row we just added to the db/otherwise dealt with
+#         logger.info("Database '%s' successfully added", database.name)
+#         return xdb
+
+#     except Exception as exc:
+#         logger.exception("Failed to add database '%s' — rolling back", xname)
+#         logger.exception(exc)
+#         session.rollback()
+#         raise
 
 # # Function to add CDS data
 # def add_cds(session, cdsseq, cdsaccession, cdsorigin, protein):
@@ -942,7 +944,7 @@ if __name__ == "__main__":
     logger.info("Created database at %s", outdbpath)
 
     # Render database as an ER diagram
-    from eralchemy import render_er
+    #from eralchemy import render_er
 
     render_er(Base, "er_diagram.pdf")
 
