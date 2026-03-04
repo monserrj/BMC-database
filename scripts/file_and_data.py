@@ -8,14 +8,16 @@ To be able to make exceptions in code (try/except):
 from sqlalchemy.exc import IntegrityError, PendingRollbackError
 For exiting system for trouble shooting import sys
 """
-
+from more_itertools import chunked
+import logging
 from db import (
-    protein_addition,
+    add_protein,
     #name_addition,
     #cds_addition,
-    #xref_addition,
-    #xdatabase_addition,
+    add_xref,
+    add_xdatabase,
 )
+from enums import ExDatabase, enum_from_str
 
 # To make boolean values from the csv true booleans:
 def parse_bool(value):
@@ -40,28 +42,34 @@ def link_db_csv(mydata, session):
     for idx, row in enumerate(mydata):
         (
             protseq,
-            protacc,
             struct,
             canonical,
-            protname,
-            # external dbs come next in sets of 4 (dbname, url, acc, type)
+            name,
+            # external dbs come next in sets of 2 (dbname, acc)
             *db_refs,
+            dnaseq,
         ) = row
+        
         # Check what data is available:
-        print(f"\nStarting next loop ({idx=}) with {protacc=}")
+        logging.info(f"\nStarting next loop ({idx=}) with data: ({protseq[5]})")
         # Convert canonical to boolean
         canonical = parse_bool(canonical)
 
         try:  # attempt to add to db, if we raise an error, we roll back
             # Add protein data
-            protein = protein_addition(
+            # accession values are now auto-generated; ignore CSV column
+            protein = add_protein(
                 session,
                 protseq=protseq,
-                protacc=protacc,
                 struct=struct,
                 canonical=canonical,
             )
-            print(f"\nProtein record returned: {protein}")
+            logging.info(f"\nProtein record returned: {protein}")
+            if protein is None:
+                logging.warning("Skipping row due to failed protein insertion: %5s", protseq)
+                # nothing further to link, move to next entry
+                session.rollback()
+                continue
             
             # gene = cds_addition(
             #     session,
@@ -69,40 +77,49 @@ def link_db_csv(mydata, session):
             #     dnaseq=dnaseq,
             #     protein=protein,
             # )
-            # print(f"\nProtein record returned: {protein}")
-            # print(f"\nGene record returned: {gene}")
+            # logging.info(f"\nProtein record returned: {protein}")
+            # logging.info(f"Gene record returned: {gene}")
 
             # Add name data
             # name = name_addition(session, protname=protname, protein=protein)
 
-            # print(f"\nProtein record returned: {protein}")
-            # print(f"Name record returned: {name}")
+            # logging.info(f"\nProtein record returned: {protein}")
+            # logging.info(f"Name record returned: {name}")
 
             # Add external reference data
             # Handle external DB refs
-            # They come in groups of 4: db, url, acc, type
-        #     for i in range(0, len(db_refs), 4):
-        #         dbname, dburl, accessionid, dbtype = db_refs[i : i + 4]
-
-        #         # skip empty slots if some rows don’t have all 7 filled
-        #         if not any([dbname, dburl, accessionid, dbtype]):
-        #             continue
-
-        #         xref = xref_addition(
-        #             session,
-        #             accessionid=accessionid,
-        #             dbname=dbname,
-        #             dburl=dburl,
-        #             protein=protein,
-        #         )
-        #     print(f"\nProtein record returned: {protein}")
-        #     print(f"Name record returned: {xref}")
+            for db_name, db_acc in chunked(db_refs, 2):
+                if not db_name or not db_acc:
+                    continue  # skip empty db refs
+                
+                # Convert db_name string to ExDatabase enum with explicit typo catching
+                try:
+                    db_enum = enum_from_str(ExDatabase, db_name)
+                except ValueError as e:
+                    logging.error(f"Invalid database name '{db_name}': {e}. Skipping this xref.")
+                    continue  # skip this xref but continue processing others
+                
+                # Known enum value: auto-add it without confirmation prompt
+                xdb = add_xdatabase(session, db_enum, confirm=False)
+                
+                # Add xref if database was successfully retrieved/added
+                if xdb:
+                    xref = add_xref(
+                        session,
+                        xdb=xdb,
+                        protein=protein,
+                        xrefacc=db_acc,
+                    )
+                    logging.info(f"\nExternal reference record returned: {xref}")
             
             # Commit the transaction after successful addition
-            print("Committing the session")
+            logging.info("Committing the session")
             session.commit()
+            # detach all objects to avoid cross-iteration state issues
+            # ask Leighton unsure
+            session.expunge_all()
 
         except Exception as exc:
-            print(f"Error adding data: {exc}")
-            print("Rolling back changes and skipping to next entry")
+            logging.error(f"Error adding data: {exc}")
+            logging.info("Rolling back changes and skipping to next entry")
             session.rollback()

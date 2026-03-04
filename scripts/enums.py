@@ -38,14 +38,14 @@ class DatabaseType(Enum):
     TAXONOMY = "TAXONOMY"
     # OTHER = "OTHER" Unsure if needed?
 
-class Database(Enum):
+class ExDatabase(Enum):
     """Enum for specific external biological databases."""
     PDB = (DatabaseType.STRUCTURE, "https://www.rcsb.org")
     NCBI = (DatabaseType.SEQUENCE, "https://www.ncbi.nlm.nih.gov")
     UNIPROT = (DatabaseType.SEQUENCE, "https://www.uniprot.org")
     NCBITAX = (DatabaseType.TAXONOMY, "https://www.ncbi.nlm.nih.gov/taxonomy")
     GO = (DatabaseType.FUNCTION, "https://geneontology.org")
-    
+    KO = (DatabaseType.FUNCTION, "https://www.genome.jp/kegg/ko.html")
     def __init__(self, type: DatabaseType, url: str):
         self.type = type
         self.url = url
