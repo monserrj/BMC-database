@@ -14,7 +14,8 @@ import sys
 from pathlib import Path  # for type hints
 from typing import Optional
 
-from enums import DatabaseType, StructProtType, enum_from_str
+
+from enums import DatabaseType, ExDatabase, StructProtType, enum_from_str
 
 # Import  SQLAlchemy classes needed with a declarative approach.
 from sqlalchemy import (
@@ -29,6 +30,7 @@ from sqlalchemy import (
     String,
     or_,
     create_engine,
+    func,
 )
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -125,16 +127,12 @@ class Xdatabase(Base):
     xref_db_id: Mapped[int] = mapped_column(
         primary_key=True, autoincrement=True
     )  # Local id for database
-    xref_db_name: Mapped[str] = mapped_column(
-        nullable=False, unique=True
-    )  # Database with crossref
-    xref_href: Mapped[str] = mapped_column(
-        nullable=False, unique=True
-    )  # URL to database
-    #    xref_type = Column(SQLEnum(DatabaseType, name ="database_type_enum", nullable=False))   # Not currently defined
+    exdatabase : Mapped[Enum] = Column(Enum(ExDatabase), nullable=False, unique=True)  # Enum for database name, type and url
 
     # Define relationships using Declarative
     xref: Mapped[list["Xref"]] = relationship(back_populates="xref_db")
+
+
 
 
 class Xref(Base):  # All external references
@@ -564,13 +562,16 @@ class Ppi_complex(Base):
 
 
 # # Function to add protein data
-def add_protein(session, protacc, protseq, struct, canonical):
+def add_protein(session, protseq, struct, canonical):
     """
     Args:
     protseq (str): Protein sequence.
-    protacc (str): Protein unique accession number
     struct (str): Protein structure type.
     canonical (boolean): Canonical if true, false if isoform
+
+    Accessions are auto-generated in the format PRXXXX where XXXX is a
+    zero-padded number derived from the protein's primary key. This ensures
+    sequential identifiers starting at PR0001.
 
     Explanation on how the code works:
     1. If the protein already exists, store it in the `protein` variable
@@ -587,43 +588,44 @@ def add_protein(session, protacc, protseq, struct, canonical):
     """
     logger.debug(f"\nNow in {add_protein.__name__}")
 
-    print(f"Before query, {protseq[:10]=}..., {protacc=}, {struct=}, {canonical=}")
+    logger.debug(f"Before query, {protseq[:10]=}..., {struct=}, {canonical=}")
 
     # Create a new protein object
     try:
+        # first check if the sequence already exists
         protein = session.query(Protein).filter(Protein.prot_seq == protseq).first()
-        print(f"After query, {protein=}")
+        if protein:
+            logger.info("Protein sequence already exists, returning existing accession %s", protein.prot_accession)
+            return protein
+
+        logger.debug(f"After query, {protein=}")
 
         # Enforce protein structure type
-        if struct.upper() not in StructProtType:  # invalid protein structure type
-            logger.warning(
-                "Skipping invalid struct type: %s (accession: %s)", struct, protacc
-            )
-        else:
+        try:
             struct = StructProtType[struct.upper()]
+        except KeyError:
+            logger.warning(
+                "Skipping invalid struct type: %s", struct,
+            )
+            return None
 
-        if protein:
-            logger.info(
-                "Protein already exists: accession=%s id=%s",
-                protacc,
-                protein.prot_id,
-            )
-        # Add protein if it is not already present
-        if not protein:
-            protein = Protein(
-                prot_seq=protseq,
-                prot_accession=protacc,
-                struct_prot_type=struct,
-                is_canonical=canonical,
-            )
-            session.add(protein)
-            session.flush()  # This sends the changes to the database, so prot_id is assigned
-            logger.info(
-                "Protein %s added with accession %s",
-                protein.prot_id,
-                protacc,
-            )
-            return protein
+        # determine next accession number by looking at current max prot_id
+        max_id = session.query(func.coalesce(func.max(Protein.prot_id), 0)).scalar()
+        next_id = max_id + 1
+        accession = f"PR{next_id:04d}"
+
+        # create new protein with generated accession
+        protein = Protein(
+            prot_seq=protseq,
+            prot_accession=accession,
+            struct_prot_type=struct,
+            is_canonical=canonical,
+        )
+        session.add(protein)
+        session.flush()  # assign prot_id
+        logger.info("Generated accession %s for protein ID %s", protein.prot_accession, protein.prot_id)
+
+        return protein
     except Exception as exc:
         logger.exception("Failed to add protein accession=%s", protacc)
         logger.exception(exc)
@@ -631,57 +633,160 @@ def add_protein(session, protacc, protseq, struct, canonical):
         raise
 
 
-# # Function to add Xdatabase data 
-# def add_xdatabase(session, xname, href, xtype):
+# Function to add Xdatabase data 
+def add_xdatabase(session, database, confirm=True):
 
 #     ''' Args:
-#     xdb_name (str): Database name.
+#     session: SQLAlchemy session to the database
+#     xname (str): Database name.
 #     href (str): Database URL.
-#     xdb_type (str): Database type (sequence, structure, function, taxonomy)
+#     xtype (str): Database type (sequence, structure, function, taxonomy)
+#     confirm (bool): Whether to ask the user to confirm adding a new database type if xtype is not recognised
 
 #     Explanation on how the code works:
 #     1. Check if the database already exists,  store it in the `xdb` variable
-#     2. If the database does not exist, create a new db object and add it to the
-#        session
-#     3. Commit the session to the database
+#     2. If the database does not exist, check that this new database typews added (Y/N) questions
+#     3. If yes, create a new db object and add it to the session
+#     4. Commit the session to the database
 #     '''
 
-#     print(f"\nNow in {add_xdatabase.__name__}")
-#     print(f"Before query, {xname=}, {href=}, {xtype=}")
+    logger.debug(f"\nNow in {add_xdatabase.__name__}")
+    
+    logger.debug(f"Before query, {database=}")
 
-# Check and convert xtype
-# if isinstance(xtype, str):
-#     try:
-#         xtype = enum_from_str(DatabaseType, xtype)
-#     except ValueError as e:
-#         print(f"Invalid database type: {xtype!r} — {e}")
-#         return None
+    # Check existence by enum value stored in exdatabase column
+    xdb = (
+        session.query(Xdatabase)
+        .filter_by(exdatabase=database)
+        .first()
+    )
 
-# elif not isinstance(xtype, DatabaseType):
-#     print(f"xtype must be a string or DatabaseType, got {type(xtype)}")
-#     return None
-# print(f"Converted xtype to Enum: {xtype}")
+    if xdb:
+        logger.info("Database %s already exists", database.name)
+        return xdb
 
-#     # Create a new db object
-#     xdb = (
-#         session.query(Xdatabase)
-#         .filter(Xdatabase.xref_db_name == xname)
-#         .filter(Xdatabase.xref_href == href)
-#         .first()
-#     )
-#     print(f"After query, {xdb=}")
+    # Add db if it is not already present
+    # if confirm:
+        # COMMENTED OUT FOR NOW - Can be re-enabled if needed for interactive prompts
+        # response = input(
+        #     f"Add new database '{database.name}' ({database.type.value})? [y/N]: "
+        # ).strip().lower()
+        # response = "y"  # Auto-accept when confirm=True for now
+    # else:
+        # When not confirming (used in batch imports), assume yes
+        # response = "y"
 
-#     # Add db if it is not already present
-#     if not xdb:
-#         xdb = Xdatabase(xref_db_name=xname, xref_href=href, xref_type=xtype)
-#         session.add(xdb)
-#         session.flush()
-#         print(f"Database {xname} added")
-#     else:
-#         print(f"This database {xname} has already being added")
-#     print(f"Database row returned: {xdb}")
+    # if response not in {"y", "yes"}:
+    #     logger.info("User declined insertion")
+    #     return None
 
-#     return xdb  # Return the db row we just added to the db/otherwise dealt with
+    # Insert new database
+    try:
+        xdb = Xdatabase(exdatabase=database)
+        session.add(xdb)
+        session.flush()
+
+        logger.info("Database '%s' successfully added", database.name)
+        return xdb
+
+    except Exception as exc:
+        logger.exception("Failed to add database '%s' — rolling back", database)
+        logger.exception(exc)
+        session.rollback()
+        raise
+
+# Function to add xref data and linking to cds and protein
+def add_xref(session, xdb, protein, xrefacc, cds=None):
+
+    ''' Args:
+        xdb: Xdatabase ORM object (external DB already added)
+        protein: Protein ORM object
+        xrefacc (str): accession string for this external reference
+        cds: Cds ORM object (optional, currently unused)
+
+    Explanation on how the code works:
+    1. Check if the xref already exists,  store it in the `xref` variable
+    2. If the xref does not exist, create a new xref object and add it to the
+    session
+
+    Need to think on how to do that, condition depending on type of database?
+    3. Check if the xref is already associated with the cds_xref, and if not
+    create a new `cds_xref` object and add it to the session
+    4. Check if the xref is already associated with the prot_xref, and if not
+    create a new `prot_xref` object and add it to the session
+
+    4. Commit the session to the database
+    '''
+
+    logger.debug(f"\nNow in {add_xref.__name__} with {xrefacc=}")
+
+    logger.debug(f"Before query, {xdb=}, {xrefacc=}, {protein=}")
+
+    # if no protein provided, skip linking steps later
+    if protein is None:
+        logger.warning("No protein object provided to add_xref; xref will not be linked to protein.")
+
+    # Create a new xref object
+    try:
+        xref = (
+            session.query(Xref)
+            .filter(Xref.xref_acc_ext == xrefacc).first()
+        )
+        logger.debug(f"After query, {xref=}")
+
+        # Add xref if it is not already present
+        if not xref:
+            # use the relationship attribute 'xref_db' to link to Xdatabase
+            xref = Xref(xref_acc_ext=xrefacc, xref_db=xdb)
+            session.add(xref)
+            session.flush()
+            logger.info(f"External reference {xrefacc=} from database {xdb=} added")
+        else:
+            logger.info(f"This external reference {xrefacc=} from database {xdb=} has already being added")
+        logger.info(f"External reference row returned: External reference {xrefacc=}")
+
+        # Associate the reference and protein information in the prot_xref
+        logger.debug(f"{xref.proteins=}, {type(xref.proteins)}")
+
+        # 2. Link to Protein (ProteinXref) if we have a protein object
+        if protein is not None:
+            # use explicit primary key values to avoid ORM dependency issues
+            link_prot = (
+                session.query(ProteinXref)
+                .filter_by(prot_id=protein.prot_id, xref_id=xref.xref_id)
+                .first()
+            )
+
+            if not link_prot:
+                link_prot = ProteinXref(prot_id=protein.prot_id, xref_id=xref.xref_id)
+                session.add(link_prot)
+                session.flush()
+                logger.info(f"Linked Protein {protein} <-> Xref {xref} (flush assigned link_prot={link_prot})")
+            else:
+                logger.info(f"Protein {protein} already linked to Xref {xref}")
+        else:
+            logger.debug("Skipping protein linkage because no protein provided.")
+
+        # # 3. Link to CDS (CdsXref)
+        # link_cds = (
+        #     session.query(CdsXref)
+        #     # Unsure about this?
+        #     .filter_by(cds==cds and xref==xref)
+        #     .first()
+        # )
+
+        # if not link_cds:
+        #     link_cds = Cds_xref(cds=cds, xref=xref)
+        #     session.add(link_cds)
+        #     print(f"Linked CDS {cds} <-> Xref {xref}")
+        # else:
+        #     print(f"CDS {cds} already linked to Xref {xref}")
+        return xref  # Return the reference row we just added to the db/otherwise dealt with
+    except Exception as exc:
+        logger.exception("Failed to add xref %s for database %s", xrefacc, xdb)
+        logger.exception(exc)
+        session.rollback()
+        raise
 
 # # Function to add CDS data
 # def add_cds(session, cdsseq, cdsaccession, cdsorigin, protein):
@@ -734,86 +839,6 @@ def add_protein(session, protacc, protseq, struct, canonical):
 
 #     return cds  # Return the cds row we just added to the db/otherwise dealt with
 
-# # Function to add xref data and linking to cds and protein
-# def add_xref(session, xdb, cds, protein, xrefacc):
-
-#     ''' Args:
-#         xdb: Xdatabase ORM object (external DB already added)
-#         cds: Cds ORM object
-#         protein: Protein ORM object
-#         xrefacc (str): accession string for this external reference
-
-#     Explanation on how the code works:
-#     1. Check if the xref already exists,  store it in the `xref` variable
-#     2. If the xref does not exist, create a new xref object and add it to the
-#        session
-
-#     Need to think on how to do that, condition depending on type of database?
-#     3. Check if the xref is already associated with the cds_xref, and if not
-#        create a new `cds_xref` object and add it to the session
-#     4. Check if the xref is already associated with the prot_xref, and if not
-#        create a new `prot_xref` object and add it to the session
-
-#     4. Commit the session to the database
-#     '''
-
-#     print(f"\nNow in {add_xref.__name__} with {xrefacc=}")
-
-#     print(f"Before query, {xdb=}, {xrefacc=}")
-
-#     # Create a new xref object
-#     xref = (
-#         session.query(Xref)
-#         .filter(Xref.xref_acc_ext == xrefacc)
-#         .first()
-#     )
-#     print(f"After query, {xref=}")
-
-#     # Add xref if it is not already present
-#     if not xref:
-#         xref = Xref(xref_acc_ext=xrefacc, XDatabase=xdb)
-#         session.add(xref)
-#         session.flush()
-#         print(f"External reference {xrefacc=} from database {xdb=} added")
-#     else:
-#         print(f"This external reference {xrefacc=} from database {xdb=} has already being added")
-#     print(f"External reference row returned: External reference {xrefacc=}")
-
-#     # Associate the reference and protein information in the prot_xref
-#     print(f"{xref.proteins=}, {type(xref.proteins)}")
-
-#     # 2. Link to Protein (ProteinXref)
-#     link_prot = (
-#         session.query(ProteinXref)
-#         # Unsure about this?
-#         .filter_by(protein==protein and xref==xref)
-#         .first()
-#     )
-
-#     if not link_prot:
-#         link_prot = ProteinXref(protein=protein, xref=xref)
-#         session.add(link_prot)
-#         print(f"Linked Protein {protein} <-> Xref {xref}")
-#     else:
-#         print(f"Protein {protein} already linked to Xref {xref}")
-
-#     # 3. Link to CDS (CdsXref)
-#     link_cds = (
-#         session.query(CdsXref)
-#         # Unsure about this?
-#         .filter_by(cds==cds and xref==xref)
-#         .first()
-#     )
-
-#     if not link_cds:
-#         link_cds = Cds_xref(cds=cds, xref=xref)
-#         session.add(link_cds)
-#         print(f"Linked CDS {cds} <-> Xref {xref}")
-#     else:
-#         print(f"CDS {cds} already linked to Xref {xref}")
-
-
-#     return xref  # Return the renference row we just added to the db/otherwise dealt with
 
 # # Function to add name data 
 # def add_name(session, protname, protein):
@@ -942,9 +967,9 @@ if __name__ == "__main__":
     logger.info("Created database at %s", outdbpath)
 
     # Render database as an ER diagram
-    from eralchemy import render_er
+    #from eralchemy import render_er
 
-    render_er(Base, "er_diagram.pdf")
+    # render_er(Base, "er_diagram.pdf")
 
 ## How to populate parent child relationships for CDS
 # Suppose we have CDS with the following relationships

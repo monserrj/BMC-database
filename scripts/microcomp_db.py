@@ -11,7 +11,7 @@ We'll use click to manage the command line interface and SQLAlchemy to manage th
 # followed and explanations kept to help following through
 import sys
 from pathlib import Path
-
+import logging
 import click
 
 # Import the database file, csv and the data addition file to create
@@ -48,25 +48,27 @@ def main(dbpath: Path, csvpath: Path, force: bool, verbose: bool):
     """Main function to run the script."""
     # Create the database if it doesn't exist, or we're forcing overwrite
     if force is True and dbpath.exists():  # overwrite database
-        print(f"Overwriting {dbpath}")
+        logging.info(f"\nOverwriting {dbpath}")
         dbpath.unlink()  # Delete the old database file
     elif dbpath.exists():
-        print(f"Not overwriting {dbpath} (exiting)")
+        logging.info(f"\nNot overwriting {dbpath} (exiting)")
         sys.exit(0)
     
     #Build database URL:
     db_url = f"sqlite:///{dbpath.as_posix()}"
-    print(f"Using database: {db_url}", dbpath)
+    logging.info(f"\nUsing database: {db_url}")
     #Create db and session
     create_db(dbpath)  # Pass Path object, not URL string
     session = get_session(dbpath)  # Pass Path object, not URL string
 
     # Read CSV file to import data
-    print(f"{csvpath=}")
+    logging.info(f"\nReading CSV file: {csvpath}")
     data = read_file(csvpath, verbose)
 
     # Link the data from the CSV file to the database
     link_db_csv(data, session)
+    logging.info("\nData linking complete. Closing session.\n\n")
+    session.close()
 
 
 # The syntax here is "special"
