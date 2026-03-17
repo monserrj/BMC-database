@@ -638,6 +638,18 @@ def add_protein(session, protseq, struct, canonical):
         raise
 
 
+# Mapping of known databases to whether they link to CDS (True) or Protein (False)
+# CDS (genes): NCBI, NCBITAX, GO (when linked to genes)
+# Protein: Uniprot, KO (KEGG Orthology), PDB
+DATABASE_TARGETS = {
+    "NCBI": True,      # CDS
+    "NCBITAX": True,   # CDS
+    "GO": True,        # CDS
+    "Uniprot": False,  # PROTEIN
+    "KO": False,       # PROTEIN
+    "PDB": False,      # PROTEIN
+}
+
 # Function to add Xdatabase data 
 def add_xdatabase(session, xname, xurl=None, xtype=None, require_password=True):
 
@@ -692,7 +704,11 @@ def add_xdatabase(session, xname, xurl=None, xtype=None, require_password=True):
     if not require_password:
         # Add database directly without password (for trusted CSV sources)
         try:
-            xdb = Xdatabase(xref_db_name=xname, xref_db_url=xurl, xref_db_type=xtype)
+            xdb = Xdatabase(
+                xref_db_name=xname,
+                xref_db_url=xurl,
+                xref_db_type=xtype,
+            )
             session.add(xdb)
             session.flush()
             logger.info("Database '%s' added from trusted source", xname)
@@ -726,9 +742,15 @@ def add_xdatabase(session, xname, xurl=None, xtype=None, require_password=True):
                     valid = [e.name for e in DatabaseType]
                     logger.error("Invalid database type '%s' (must be one of %s)", xtype_str, valid)
                     return None
+            target_str = input("Link to CDS (gene) or Protein? [CDS/Protein]: ").strip().upper()
+            # Note: This is only used at import time, not stored in database
 
         try:
-            xdb = Xdatabase(xref_db_name=xname, xref_db_url=xurl, xref_db_type=xtype)
+            xdb = Xdatabase(
+                xref_db_name=xname,
+                xref_db_url=xurl,
+                xref_db_type=xtype,
+            )
             session.add(xdb)
             session.flush()
 
@@ -837,6 +859,8 @@ def add_xref(session, xdb, protein, xrefacc, cds=None):
         logger.exception(exc)
         session.rollback()
         raise
+
+
 
 # # Function to add CDS data
 # def add_cds(session, cdsseq, cdsaccession, cdsorigin, protein):

@@ -19,6 +19,9 @@ from db import (
     # cds_addition,
     add_xref,
     add_xdatabase,
+    Xref,
+    CdsXref,
+    DATABASE_TARGETS,
 )
 from readfile import read_file
 
@@ -37,14 +40,16 @@ def load_databases_from_csv(session, dbinfo_path: Path, verbose: bool = False):
     The CSV is expected to have a header row, then rows like:
         name,type,url
 
+    Databases are mapped to CDS or PROTEIN targets using DATABASE_TARGETS during import
+    (mapping is only used at import time, not stored in database).
     Any invalid rows are logged and skipped.
     """
 
     dbinfo = read_file(dbinfo_path, verbose)
     for idx, row in enumerate(dbinfo):
         try:
-            xname, xtype, xurl = row
-        except ValueError:
+            xname, xtype, xurl = row[0], row[1], row[2]
+        except (ValueError, IndexError):
             logging.error("Invalid database info row %s: %s", idx, row)
             continue
 
@@ -147,14 +152,25 @@ def link_db_csv(mydata, session, dbinfo_path: Path | None = None):
                         )
                         continue
 
-                # Add xref if database was successfully retrieved/added
-                xref = add_xref(
-                    session,
-                    xdb=xdb,
-                    protein=protein,
-                    xrefacc=db_acc,
-                )
-                logging.info(f"\nExternal reference record returned: {xref}")
+                # Link xref based on database target (CDS or PROTEIN)
+                # Use DATABASE_TARGETS mapping to determine linking behavior
+                is_cds_db = DATABASE_TARGETS.get(db_name, False)  # Default to PROTEIN if not in mapping
+                
+                if is_cds_db:
+                    # This database links to CDS (genes)
+                    logging.debug(f"Database '{db_name}' is for CDS linking")
+                    # TODO: Link to CDS when CDS data is available
+                    # For now, this will be implemented when CDS is uncommented
+                else:
+                    # This database links to PROTEIN
+                    logging.debug(f"Database '{db_name}' is for PROTEIN linking")
+                    xref = add_xref(
+                        session,
+                        xdb=xdb,
+                        protein=protein,
+                        xrefacc=db_acc,
+                    )
+                    logging.info(f"\nExternal reference record returned: {xref}")
             
             # Commit the transaction after successful addition
             logging.info("Committing the session")
