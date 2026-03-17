@@ -1,0 +1,11 @@
+﻿Name,Type,Url
+PDB,Structure,https://www.rcsb.org
+NCBI,Sequence,https://www.ncbi.nlm.nih.gov
+Uniprot,Sequence,https://www.uniprot.org
+NCBITAX,Taxonomy,https://www.ncbi.nlm.nih.gov/taxonomy
+GO,Function,https://geneontology.org
+KO,Function,https://www.genome.jp/kegg/ko.html
+,,
+,,
+,,
+,,

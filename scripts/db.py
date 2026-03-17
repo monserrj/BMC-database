@@ -15,7 +15,7 @@ from pathlib import Path  # for type hints
 from typing import Optional
 
 
-from enums import DatabaseType, ExDatabase, StructProtType, enum_from_str
+from enums import DatabaseType, StructProtType, enum_from_str
 
 # Import  SQLAlchemy classes needed with a declarative approach.
 from sqlalchemy import (
@@ -39,6 +39,9 @@ from sqlalchemy.orm import (
     mapped_column,
     sessionmaker,
 )
+
+import os
+from getpass import getpass
 
 #######################################################
 # (2) Generic SQLAlchemy configuration
@@ -127,8 +130,10 @@ class Xdatabase(Base):
     xref_db_id: Mapped[int] = mapped_column(
         primary_key=True, autoincrement=True
     )  # Local id for database
-    exdatabase : Mapped[Enum] = Column(Enum(ExDatabase), nullable=False, unique=True)  # Enum for database name, type and url
-
+    xref_db_name: Mapped[str] = mapped_column(nullable=False, unique=True)  # Database name
+    xref_db_type: Mapped[Enum] = Column(Enum(DatabaseType))  # Database type (sequence, structure, function, taxonomy)
+    xref_db_url: Mapped[Optional[str]] = mapped_column(nullable=False, unique=True)  # Database URL
+    
     # Define relationships using Declarative
     xref: Mapped[list["Xref"]] = relationship(back_populates="xref_db")
 
@@ -634,12 +639,12 @@ def add_protein(session, protseq, struct, canonical):
 
 
 # Function to add Xdatabase data 
-def add_xdatabase(session, database, confirm=True):
+def add_xdatabase(session, xname, xurl=None, xtype=None, require_password=True):
 
 #     ''' Args:
 #     session: SQLAlchemy session to the database
 #     xname (str): Database name.
-#     href (str): Database URL.
+#     xurl (str): Database URL.
 #     xtype (str): Database type (sequence, structure, function, taxonomy)
 #     confirm (bool): Whether to ask the user to confirm adding a new database type if xtype is not recognised
 
@@ -652,48 +657,93 @@ def add_xdatabase(session, database, confirm=True):
 
     logger.debug(f"\nNow in {add_xdatabase.__name__}")
     
-    logger.debug(f"Before query, {database=}")
+    logger.debug(f"Before query, {xname=}")
 
-    # Check existence by enum value stored in exdatabase column
+    # Check existence by name first, then by URL
     xdb = (
         session.query(Xdatabase)
-        .filter_by(exdatabase=database)
+        .filter_by(xref_db_name=xname)
         .first()
     )
+    if not xdb and xurl:
+        xdb = (
+            session.query(Xdatabase)
+            .filter_by(xref_db_url=xurl)
+            .first()
+        )
 
     if xdb:
-        logger.info("Database %s already exists", database.name)
+        logger.info("Database %s already exists", xname)
         return xdb
 
-    # Add db if it is not already present
-    # if confirm:
-        # COMMENTED OUT FOR NOW - Can be re-enabled if needed for interactive prompts
-        # response = input(
-        #     f"Add new database '{database.name}' ({database.type.value})? [y/N]: "
-        # ).strip().lower()
-        # response = "y"  # Auto-accept when confirm=True for now
-    # else:
-        # When not confirming (used in batch imports), assume yes
-        # response = "y"
+    # Validate/normalize xtype to DatabaseType enum
+    if isinstance(xtype, str):
+        try:
+            xtype = DatabaseType[xtype.strip().upper()]
+        except KeyError:
+            valid = [e.name for e in DatabaseType]
+            logger.warning(
+                "Invalid database type '%s' (must be one of %s)",
+                xtype,
+                valid,
+            )
+            return None
 
-    # if response not in {"y", "yes"}:
-    #     logger.info("User declined insertion")
-    #     return None
+    if not require_password:
+        # Add database directly without password (for trusted CSV sources)
+        try:
+            xdb = Xdatabase(xref_db_name=xname, xref_db_url=xurl, xref_db_type=xtype)
+            session.add(xdb)
+            session.flush()
+            logger.info("Database '%s' added from trusted source", xname)
+            return xdb
+        except Exception as exc:
+            logger.exception("Failed to add database '%s' — rolling back", xname)
+            session.rollback()
+            raise
 
-    # Insert new database
-    try:
-        xdb = Xdatabase(exdatabase=database)
-        session.add(xdb)
-        session.flush()
+    # Insert new database (requires password and may need additional info)
+    logger.info("This external database %s does not exist, to add to database provide password", xname)
+    password = getpass("Password: ")
+    expected_password = os.getenv("DB_ADD_PASSWORD")
 
-        logger.info("Database '%s' successfully added", database.name)
-        return xdb
+    if expected_password is None:
+        # how to set password: export DB_ADD_PASSWORD="..."
+        logger.error("Environment variable DB_ADD_PASSWORD is not set")
+        return None
 
-    except Exception as exc:
-        logger.exception("Failed to add database '%s' — rolling back", database)
-        logger.exception(exc)
-        session.rollback()
-        raise
+    if password == expected_password:
+        # Password correct, now check if we need additional information
+        if not xurl or not xtype:
+            logger.info("Database '%s' approved. Please provide additional information:", xname)
+            if not xurl:
+                xurl = input("URL: ").strip()
+            if not xtype:
+                xtype_str = input("Type (Sequence/Structure/Function/Taxonomy): ").strip()
+                try:
+                    xtype = DatabaseType[xtype_str.upper()]
+                except KeyError:
+                    valid = [e.name for e in DatabaseType]
+                    logger.error("Invalid database type '%s' (must be one of %s)", xtype_str, valid)
+                    return None
+
+        try:
+            xdb = Xdatabase(xref_db_name=xname, xref_db_url=xurl, xref_db_type=xtype)
+            session.add(xdb)
+            session.flush()
+
+            logger.info("Database '%s' successfully added", xname)
+            return xdb
+
+        except Exception as exc:
+            logger.exception("Failed to add database '%s' — rolling back", xname)
+            logger.exception(exc)
+            session.rollback()
+            raise
+
+    else:
+        logger.warning("Incorrect password provided, database '%s' not added", xname)
+        return None
 
 # Function to add xref data and linking to cds and protein
 def add_xref(session, xdb, protein, xrefacc, cds=None):
