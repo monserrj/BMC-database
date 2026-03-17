@@ -23,14 +23,19 @@ from file_and_data import link_db_csv
 
 @click.command()
 @click.option(
-    "--dbpath",
+    "--dbpath",  # Path to the SQLite database file to create or use
     default=Path("bmc.db"),
     type=click.Path(exists=False, path_type=Path),
 )
 @click.option(
-    "--csvpath",
+    "--csvpath",  # Path to the CSV file containing protein data to import
     default=Path("../data/raw/prot_info/prot_data_minimal_correct_UP.csv"),
     type=click.Path(exists=False, path_type=Path),
+)
+@click.option(
+    "--dbinfo",  # Path to the CSV file containing external database definitions
+    default=None,
+    type=click.Path(exists=True, path_type=Path),
 )
 @click.option(
     "--force/--no-force",
@@ -40,8 +45,14 @@ from file_and_data import link_db_csv
     "--verbose/--no-verbose",
     default=False,
 )
-def main(dbpath: Path, csvpath: Path, force: bool, verbose: bool):
+def main(dbpath: Path, csvpath: Path, dbinfo: Path, force: bool, verbose: bool):
     """Main function to create the database and link data from CSV file."""
+    
+    # Configure logging
+    if verbose:
+        logging.basicConfig(level=logging.DEBUG, format='%(levelname)s:%(name)s:%(message)s')
+    else:
+        logging.basicConfig(level=logging.INFO, format='%(levelname)s:%(message)s')
     
     dbpath = dbpath.resolve()
     
@@ -66,7 +77,7 @@ def main(dbpath: Path, csvpath: Path, force: bool, verbose: bool):
     data = read_file(csvpath, verbose)
 
     # Link the data from the CSV file to the database
-    link_db_csv(data, session)
+    link_db_csv(data, session, dbinfo_path=dbinfo)
     logging.info("\nData linking complete. Closing session.\n\n")
     session.close()
 

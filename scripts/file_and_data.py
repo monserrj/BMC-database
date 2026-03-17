@@ -10,14 +10,17 @@ For exiting system for trouble shooting import sys
 """
 from more_itertools import chunked
 import logging
+from pathlib import Path
+
 from db import (
+    Xdatabase,
     add_protein,
-    #name_addition,
-    #cds_addition,
+    # name_addition,
+    # cds_addition,
     add_xref,
     add_xdatabase,
 )
-from enums import ExDatabase, enum_from_str
+from readfile import read_file
 
 # To make boolean values from the csv true booleans:
 def parse_bool(value):
@@ -28,17 +31,52 @@ def parse_bool(value):
     return str(value).strip().lower() in ("true", "yes")
 
 # Making a function for the addition of data to the different tables created with db.py following data_instructions:
-def link_db_csv(mydata, session):
-    """Function for each data type addition created
-    Add the data to the database in a loop, but we'll have to
-    check if the data entered already exist
-    and update the corresponding tables accordingly.
-    We need to check if the sequence, structure, and accession already exist,
-    and update the corresponding tables accordingly if they do not.
-    We can then update the linker tables by adding the corresponding items.
+def load_databases_from_csv(session, dbinfo_path: Path, verbose: bool = False):
+    """Load external database info from a CSV and add to the Xdatabase table.
+
+    The CSV is expected to have a header row, then rows like:
+        name,type,url
+
+    Any invalid rows are logged and skipped.
     """
 
-    # Can I make this bit more efficient with a loop?
+    dbinfo = read_file(dbinfo_path, verbose)
+    for idx, row in enumerate(dbinfo):
+        try:
+            xname, xtype, xurl = row
+        except ValueError:
+            logging.error("Invalid database info row %s: %s", idx, row)
+            continue
+
+        if not xname:
+            logging.warning("Skipping empty database name at row %s", idx)
+            continue
+
+        xdb = add_xdatabase(
+            session,
+            xname=xname,
+            xurl=xurl,
+            xtype=xtype,
+            require_password=False,
+        )
+        if not xdb:
+            logging.warning("Failed to add or find database %s", xname)
+    session.commit()
+
+
+def link_db_csv(mydata, session, dbinfo_path: Path | None = None):
+    """Import protein data and link references from a CSV.
+
+    If dbinfo_path is provided, it is first loaded into the database.
+    """
+
+    # Optionally load external database info first
+    if dbinfo_path:
+        logging.info(f"Loading databases from CSV: {dbinfo_path}")
+        load_databases_from_csv(session, dbinfo_path)
+        logging.info("Database loading complete")
+
+    # Process protein rows
     for idx, row in enumerate(mydata):
         (
             protseq,
@@ -51,7 +89,7 @@ def link_db_csv(mydata, session):
         ) = row
         
         # Check what data is available:
-        logging.info(f"\nStarting next loop ({idx=}) with data: ({protseq[5]})")
+        logging.info(f"\nStarting next loop ({idx=}) with protein prefix: {protseq[:10]}...")
         # Convert canonical to boolean
         canonical = parse_bool(canonical)
 
@@ -91,26 +129,32 @@ def link_db_csv(mydata, session):
             for db_name, db_acc in chunked(db_refs, 2):
                 if not db_name or not db_acc:
                     continue  # skip empty db refs
-                
-                # Convert db_name string to ExDatabase enum with explicit typo catching
-                try:
-                    db_enum = enum_from_str(ExDatabase, db_name)
-                except ValueError as e:
-                    logging.error(f"Invalid database name '{db_name}': {e}. Skipping this xref.")
-                    continue  # skip this xref but continue processing others
-                
-                # Known enum value: auto-add it without confirmation prompt
-                xdb = add_xdatabase(session, db_enum, confirm=False)
-                
-                # Add xref if database was successfully retrieved/added
-                if xdb:
-                    xref = add_xref(
+
+                # Lookup the database record by name
+                xdb = session.query(Xdatabase).filter_by(xref_db_name=db_name).first()
+
+                if not xdb:
+                    # Try to add the database (will prompt for password and info if not in approved list)
+                    xdb = add_xdatabase(
                         session,
-                        xdb=xdb,
-                        protein=protein,
-                        xrefacc=db_acc,
+                        xname=db_name,
+                        require_password=True,
                     )
-                    logging.info(f"\nExternal reference record returned: {xref}")
+                    if not xdb:
+                        logging.error(
+                            "Failed to add database '%s'; skipping this xref.",
+                            db_name,
+                        )
+                        continue
+
+                # Add xref if database was successfully retrieved/added
+                xref = add_xref(
+                    session,
+                    xdb=xdb,
+                    protein=protein,
+                    xrefacc=db_acc,
+                )
+                logging.info(f"\nExternal reference record returned: {xref}")
             
             # Commit the transaction after successful addition
             logging.info("Committing the session")
@@ -123,3 +167,4 @@ def link_db_csv(mydata, session):
             logging.error(f"Error adding data: {exc}")
             logging.info("Rolling back changes and skipping to next entry")
             session.rollback()
+
