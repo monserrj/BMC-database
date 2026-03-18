@@ -18,17 +18,16 @@ def read_file(filepath: Path, verbose: bool):
     mydata = []
     # print(f"{filepath=}")
     try:
-        with open(filepath, newline="", encoding="utf-8") as csvfile:
-            reader = csv.reader(csvfile)
-            next(reader)  # Skip header row
+        with open(filepath, newline="", encoding="utf-8-sig") as csvfile:
+            reader = csv.DictReader(csvfile)
 
             for row in reader:
                 # Convert empty strings to Null
-                row = [None if val == "" else val for val in row]
-                if (
-                    row[0] is not None
-                ):  # LP: we could do with more sanity checking of data here
-                    mydata.append(tuple(row))
+                row = {key: (None if val == "" else val) for key, val in row.items()}
+                # Check if the first column (sequence data) is not None
+                first_key = next(iter(row))
+                if row[first_key] is not None:  # LP: we could do with more sanity checking of data here
+                    mydata.append(row)
                 else:
                     click.echo("No sequence data, discarding")
     except Exception as e:

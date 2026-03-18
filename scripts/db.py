@@ -15,7 +15,7 @@ from pathlib import Path  # for type hints
 from typing import Optional
 
 
-from enums import DatabaseType, StructProtType, enum_from_str
+from enums import DatabaseType, StructProtType, ModificationType, enum_from_str
 
 # Import  SQLAlchemy classes needed with a declarative approach.
 from sqlalchemy import (
@@ -27,7 +27,6 @@ from sqlalchemy import (
     ForeignKey,
     PrimaryKeyConstraint,
     UniqueConstraint,
-    String,
     or_,
     create_engine,
     func,
@@ -39,7 +38,7 @@ from sqlalchemy.orm import (
     mapped_column,
     sessionmaker,
 )
-
+from sqlalchemy.exc import IntegrityError
 import os
 from getpass import getpass
 
@@ -286,7 +285,7 @@ class Modification(Base):
     )  # Autopopulated ID for local table
     modification_description: Mapped[str] = mapped_column(nullable=False)
 
-    #    modification_type = Column(SQLEnum(ModificationType, name="modification_type_enum"), nullable=False)   # Not currently defined
+    modification_type: Mapped[Enum] = Column(Enum(ModificationType))
 
     # Introduce all relationship between tables:
     modifications: Mapped["CdsModification"] = relationship(
@@ -570,9 +569,10 @@ class Ppi_complex(Base):
 def add_protein(session, protseq, struct, canonical):
     """
     Args:
-    protseq (str): Protein sequence.
-    struct (str): Protein structure type.
-    canonical (boolean): Canonical if true, false if isoform
+        session: SQLAlchemy session
+        protseq (str): Protein sequence.
+        struct (str): Protein structure type.
+        canonical (boolean): Canonical if true, false if isoform
 
     Accessions are auto-generated in the format PRXXXX where XXXX is a
     zero-padded number derived from the protein's primary key. This ensures
@@ -602,37 +602,37 @@ def add_protein(session, protseq, struct, canonical):
         if protein:
             logger.info("Protein sequence already exists, returning existing accession %s", protein.prot_accession)
             return protein
+        else:
+            logger.debug(f"After query, {protein=}")
+            
+            # Enforce protein structure type
+            try:
+                struct = StructProtType[struct.upper()]
+            except KeyError:
+                logger.warning(
+                    "Skipping invalid struct type: %s", struct,
+                )
+                return None
 
-        logger.debug(f"After query, {protein=}")
+            # determine next accession number by looking at current max prot_id
+            max_id = session.query(func.coalesce(func.max(Protein.prot_id), 0)).scalar()
+            next_id = max_id + 1
+            accession = f"PR{next_id:04d}"
 
-        # Enforce protein structure type
-        try:
-            struct = StructProtType[struct.upper()]
-        except KeyError:
-            logger.warning(
-                "Skipping invalid struct type: %s", struct,
+            # create new protein with generated accession
+            protein = Protein(
+                prot_seq=protseq,
+                prot_accession=accession,
+                struct_prot_type=struct,
+                is_canonical=canonical,
             )
-            return None
+            session.add(protein)
+            session.flush()  # assign prot_id
+            logger.info("Generated accession %s for protein ID %s", protein.prot_accession, protein.prot_id)
 
-        # determine next accession number by looking at current max prot_id
-        max_id = session.query(func.coalesce(func.max(Protein.prot_id), 0)).scalar()
-        next_id = max_id + 1
-        accession = f"PR{next_id:04d}"
-
-        # create new protein with generated accession
-        protein = Protein(
-            prot_seq=protseq,
-            prot_accession=accession,
-            struct_prot_type=struct,
-            is_canonical=canonical,
-        )
-        session.add(protein)
-        session.flush()  # assign prot_id
-        logger.info("Generated accession %s for protein ID %s", protein.prot_accession, protein.prot_id)
-
-        return protein
+            return protein
     except Exception as exc:
-        logger.exception("Failed to add protein accession=%s", protacc)
+        logger.exception("Failed to add protein accession=%s", accession)
         logger.exception(exc)
         session.rollback()
         raise
@@ -942,7 +942,6 @@ def add_cds(session, cdsseq, originseq, protein):
 
         # Link origin to modified if origin exists
         if origin_cds:
-            from sqlalchemy.exc import IntegrityError
             try:
                 origin_link = Origin_cds(
                     origin_id=origin_cds.cds_id,
@@ -968,7 +967,93 @@ def add_cds(session, cdsseq, originseq, protein):
         logger.exception(exc)
         session.rollback()
         raise
-
+# Add the add_modification function
+def add_modification(session, modif_descrip, modif_type, cds):
+    """
+    Adds or retrieves a modification and associates it with a CDS.
+    
+    Args:
+        session: SQLAlchemy session
+        modif_descrip (str): Description of the modification.
+        modif_type (str): Type of modification (e.g., truncated, extended, fusion, synthetic, mutated, domesticated).
+        cds: CDS object to associate with the modification.
+        
+    Returns:
+        CdsModification object representing the link between CDS and modification.
+        
+    Explanation on how the code works:
+    1. Check if a modification with the same description and type already exists.
+    2. If it exists, retrieve its ID; if not, create a new modification record.
+    3. Check if the link between the CDS and modification already exists in cds_modification.
+    4. If the link does not exist, create a new record to associate the CDS with the modification.
+    5. Flush and return the link.
+    """
+    logger.debug(f"\nNow in {add_modification.__name__}")
+    logger.debug(f"Before query, {modif_descrip=}, {modif_type=}, {cds=}")
+    
+    try:
+        # Skip if no description provided
+        if not modif_descrip or not modif_type:
+            logger.debug("Skipping modification: description or type is missing")
+            return None
+        
+        # Enforce modification type enum conversion first
+        try:
+            modif_type_enum = ModificationType[modif_type.strip().upper()]
+        except KeyError:
+            valid = [e.name for e in ModificationType]
+            logger.warning(
+                "Invalid modification type '%s' (must be one of %s)",
+                modif_type,
+                valid,
+            )
+            return None
+        
+        # Check if modification already exists
+        modification = session.query(Modification).filter(
+            Modification.modification_description == modif_descrip,
+        ).first()
+        
+        if modification:
+            logger.info(f"Modification already exists with ID {modification.modification_id}")
+        else:
+            # Create new modification record
+            modification = Modification(
+                modification_description=modif_descrip,
+                modification_type=modif_type_enum
+            )
+            session.add(modification)
+            session.flush()
+            logger.info(f"Added new modification with ID {modification.modification_id}")
+        
+        # Now link modification to CDS in cds_modification
+        cds_mod_link = session.query(CdsModification).filter(
+            CdsModification.cds_id == cds.cds_id,
+            CdsModification.modification_id == modification.modification_id
+        ).first()
+        
+        if cds_mod_link:
+            logger.info(f"CDS-modification link already exists")
+        else:
+            try:
+                cds_mod_link = CdsModification(
+                    cds_id=cds.cds_id,
+                    modification_id=modification.modification_id
+                )
+                session.add(cds_mod_link)
+                session.flush()
+                logger.info(f"Linked CDS {cds.cds_accession} to modification '{modif_descrip}'")
+            except IntegrityError as e:
+                logger.warning("CDS-modification link already exists: %s", e)
+                session.rollback()
+        
+        return cds_mod_link
+        
+    except Exception as exc:
+        logger.exception("Failed to add modification with description=%s", modif_descrip)
+        logger.exception(exc)
+        session.rollback()
+        raise
 
 # # Function to add name data 
 # def add_name(session, protname, protein):
@@ -1026,6 +1111,92 @@ def add_cds(session, cdsseq, originseq, protein):
 #         print(f"Linked name from protein: {proteingene.gene}")
 
 #         return name  # Return the gene row we just added to the db/otherwise dealt with
+
+
+# Add modification support
+def add_modification(session, modif_descrip, modif_type, cds):
+    """Add or retrieve a modification and link it to a CDS.
+
+    Args:
+        session: SQLAlchemy session
+        modif_descrip: Human-readable modification description.
+        modif_type: Modification type string (must match ModificationType enum).
+        cds: CDS ORM object to link the modification to.
+
+    Returns:
+        CdsModification ORM object (link), or None if it could not be created.
+    """
+
+    logger.debug(f"\nNow in {add_modification.__name__}")
+
+    try:
+        if not modif_descrip or not modif_type or not cds:
+            logger.debug("Skipping modification: missing description/type/CDS")
+            return None
+
+        try:
+            modif_type_enum = ModificationType[modif_type.strip().upper()]
+        except KeyError:
+            valid = [e.name for e in ModificationType]
+            logger.warning(
+                "Invalid modification type '%s' (must be one of %s)",
+                modif_type,
+                valid,
+            )
+            return None
+
+        modification = (
+            session.query(Modification)
+            .filter(
+                Modification.modification_description == modif_descrip,
+                Modification.modification_type == modif_type_enum,
+            )
+            .first()
+        )
+
+        if modification:
+            logger.info("Modification already exists with ID %s", modification.modification_id)
+        else:
+            modification = Modification(
+                modification_description=modif_descrip,
+                modification_type=modif_type_enum,
+            )
+            session.add(modification)
+            session.flush()
+            logger.info("Added new modification with ID %s", modification.modification_id)
+
+        cds_mod_link = (
+            session.query(CdsModification)
+            .filter(
+                CdsModification.cds_id == cds.cds_id,
+                CdsModification.modification_id == modification.modification_id,
+            )
+            .first()
+        )
+
+        if cds_mod_link:
+            logger.info("CDS-modification link already exists")
+            return cds_mod_link
+
+        cds_mod_link = CdsModification(
+            cds_id=cds.cds_id,
+            modification_id=modification.modification_id,
+        )
+        session.add(cds_mod_link)
+        session.flush()
+        logger.info(
+            "Linked CDS %s to modification '%s'",
+            cds.cds_accession,
+            modif_descrip,
+        )
+        return cds_mod_link
+
+    except Exception as exc:
+        logger.exception("Failed to add modification with description=%s", modif_descrip)
+        logger.exception(exc)
+        session.rollback()
+        raise
+
 
 #######################################################
 # (4) Helper functions that use the definitions to
