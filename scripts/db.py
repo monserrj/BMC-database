@@ -862,56 +862,112 @@ def add_xref(session, xdb, protein, xrefacc, cds=None):
 
 
 
-# # Function to add CDS data
-# def add_cds(session, cdsseq, cdsaccession, cdsorigin, protein):
+# Function to add CDS data
+def add_cds(session, cdsseq, originseq, protein):
+    """Add a CDS (Coding DNA Sequence) record to the database.
 
-#     ''' Args:
-#     cdsseq (str): Gene DNA sequence.
-#     cdsaccession: (str) Unique accession number CDS
-#     cds_origin (str): Original CDS sequence if the sequence is modified.
-#     protein: Protein information added with add_protein function
+    Args:
+        session: SQLAlchemy session
+        cdsseq (str): Gene DNA sequence (potentially modified)
+        originseq (str): Original CDS sequence if engineered/modified (optional)
+        protein: Protein ORM object this CDS encodes
 
-#     Explanation on how the code works:
-#     1. Check if the cds already exists,  store it in the `cds` variable
-#     2. If the cds does not exist, create a new cds object and add it to the
-#        session
-#     3. Check if the cds is already associated with the protein, and if not
-#        create a new `proteingene` object and add it to the session
-#     4. Commit the session to the database
-#     '''
+    Accessions are auto-generated in the format CDXXXX where XXXX is a
+    zero-padded number derived from the CDS's primary key.
 
-#     print(f"\nNow in {add_cds.__name__}")
+    If originseq is provided and differs from cdsseq:
+    - Creates/retrieves both original and modified CDS records
+    - Links them via Origin_cds table
+    If originseq is None or same as cdsseq:
+    - Creates only the current CDS record
 
-#     print(f"Before query, {cdsseq[:10]=}...,{cdsaccession=} {cdsorigin=}")
+    Explanation on how the code works:
+    1. Check if the current CDS sequence already exists
+    2. If it exists, return existing CDS
+    3. If originseq provided and different from cdsseq:
+       a. Find or create the origin CDS
+       b. Create the modified CDS
+       c. Link them via Origin_cds table
+    4. Else: Create only the current CDS
+    5. Return the CDS row
+    """
+    logger.debug(f"\nNow in {add_cds.__name__}")
+    logger.debug(f"Before query, {cdsseq[:10]=}..., {originseq[:10] if originseq else None}..., {protein=}")
 
-#     # Create a new cds object
-#     cds = (
-#         session.query(Cds)
-#         .filter(Cds.cds_seq == cdsseq)
-#         .first()
-#     )
-#     print(f"After query, {cds=}")
+    try:
+        # First check if the current sequence already exists
+        cds = session.query(Cds).filter(Cds.cds_seq == cdsseq).first()
+        if cds:
+            logger.info("CDS sequence already exists, returning existing accession %s", cds.cds_accession)
+            return cds
 
-#     # Add cds if it is not already present
-#     if not cds:
-#         print(f"Before adding seq and accession {cds=}")
-#         cds = Cds(
-#             cds_seq=cdsseq,
-#             cds_accession=cdsaccession,
-#             protein=protein, # Use relationship not FK directly
-#             origin=cdsorigin) # Use relationship not FK directly
-#         print(f" After adding seq and accession{cds=}")
-#         print(f"{protein.prot_id=}, {cds.cds_id=}, {cds.prot_id}")
-#         print(f"{protein.cdss=}")
-#         session.add(cds)
-#         session.flush()
-#         print(f"Cds {cdsseq[:10]=} with accession {cdsaccession=} added")
-#     else:
-#         print(f"This CDS {cdsseq[:10]=} with accession {cdsaccession=} has already being added")
+        logger.debug(f"After query, {cds=}")
 
-#     print(f"Cds row returned: {cds}")
+        # Handle origin sequence if provided and different from current sequence
+        origin_cds = None
+        if originseq and originseq.strip() and originseq != cdsseq:
+            logger.debug("CDS has origin sequence, processing origin")
+            # Find or create the origin CDS
+            origin_cds = session.query(Cds).filter(Cds.cds_seq == originseq).first()
+            if not origin_cds:
+                # Create origin CDS with same protein
+                max_id = session.query(func.coalesce(func.max(Cds.cds_id), 0)).scalar()
+                origin_accession = f"CD{max_id + 1:04d}"
+                origin_cds = Cds(
+                    cds_seq=originseq,
+                    cds_accession=origin_accession,
+                    prot_id=protein.prot_id,
+                )
+                session.add(origin_cds)
+                session.flush()
+                logger.info("Created origin CDS with accession %s", origin_cds.cds_accession)
+            else:
+                logger.info("Origin CDS already exists with accession %s", origin_cds.cds_accession)
 
-#     return cds  # Return the cds row we just added to the db/otherwise dealt with
+        # Determine next accession number for the modified CDS
+        max_id = session.query(func.coalesce(func.max(Cds.cds_id), 0)).scalar()
+        next_id = max_id + 1
+        accession = f"CD{next_id:04d}"
+
+        # Create new CDS with generated accession
+        cds = Cds(
+            cds_seq=cdsseq,
+            cds_accession=accession,
+            prot_id=protein.prot_id,
+        )
+        session.add(cds)
+        session.flush()  # assign cds_id
+
+        logger.info("Generated accession %s for CDS ID %s", cds.cds_accession, cds.cds_id)
+
+        # Link origin to modified if origin exists
+        if origin_cds:
+            from sqlalchemy.exc import IntegrityError
+            try:
+                origin_link = Origin_cds(
+                    origin_id=origin_cds.cds_id,
+                    modified_id=cds.cds_id,
+                )
+                session.add(origin_link)
+                session.flush()
+                logger.info(
+                    "Linked origin CDS %s (ID %s) to modified CDS %s (ID %s)",
+                    origin_cds.cds_accession,
+                    origin_cds.cds_id,
+                    cds.cds_accession,
+                    cds.cds_id,
+                )
+            except IntegrityError as e:
+                logger.warning("Origin-modified CDS link already exists: %s", e)
+                session.rollback()
+
+        logger.debug(f"CDS row returned: {cds}")
+        return cds
+    except Exception as exc:
+        logger.exception("Failed to add CDS with sequence=%s", cdsseq[:10])
+        logger.exception(exc)
+        session.rollback()
+        raise
 
 
 # # Function to add name data 

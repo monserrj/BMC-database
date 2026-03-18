@@ -15,8 +15,9 @@ from pathlib import Path
 from db import (
     Xdatabase,
     add_protein,
+    add_cds,
+    Cds,
     # name_addition,
-    # cds_addition,
     add_xref,
     add_xdatabase,
     Xref,
@@ -83,15 +84,62 @@ def link_db_csv(mydata, session, dbinfo_path: Path | None = None):
 
     # Process protein rows
     for idx, row in enumerate(mydata):
-        (
-            protseq,
-            struct,
-            canonical,
-            name,
-            # external dbs come next in sets of 2 (dbname, acc)
-            *db_refs,
-            dnaseq,
-        ) = row
+        # Parse CSV row with optional originseq column
+        # Format: protseq, struct, canonical, name, *db_refs, dnaseq, [originseq]
+        # originseq is optional and comes after dnaseq when present
+
+        try:
+            protseq = row[0]
+            struct = row[1]
+            canonical = row[2]
+            name = row[3]
+
+            rest = row[4:]
+
+            def _looks_like_dna(val: str) -> bool:
+                return (
+                    isinstance(val, str)
+                    and len(val.strip()) > 30
+                    and set(val.strip().upper()) <= set("ACGTN")
+                )
+
+            # Expect the last two columns (if present) to be:
+            #   - dna_seq (required)
+            #   - originseq (optional; may be empty)
+            # All preceding columns are treated as pairs of db refs.
+            if len(rest) >= 2:
+                dnaseq = rest[-2]
+                originseq = rest[-1] if rest[-1] not in (None, "") else None
+                db_refs = rest[:-2]
+            elif len(rest) == 1:
+                dnaseq = rest[0]
+                originseq = None
+                db_refs = []
+            else:
+                dnaseq = None
+                originseq = None
+                db_refs = []
+
+            # If the originseq isn't a valid DNA string, ignore it (don't create a new CDS)
+            if originseq is not None and not _looks_like_dna(originseq):
+                logging.warning(
+                    "Row %s: originseq does not look like DNA; ignoring value '%s'",
+                    idx,
+                    originseq,
+                )
+                originseq = None
+
+            # Validate dna sequence as DNA too
+            if dnaseq is not None and not _looks_like_dna(dnaseq):
+                logging.warning(
+                    "Row %s: dna_seq does not look like DNA; skipping row (value='%s')",
+                    idx,
+                    dnaseq,
+                )
+                dnaseq = None
+        except (ValueError, IndexError) as e:
+            logging.error(f"Row {idx}: Error parsing row: {e}")
+            continue
         
         # Check what data is available:
         logging.info(f"\nStarting next loop ({idx=}) with protein prefix: {protseq[:10]}...")
@@ -99,7 +147,7 @@ def link_db_csv(mydata, session, dbinfo_path: Path | None = None):
         canonical = parse_bool(canonical)
 
         try:  # attempt to add to db, if we raise an error, we roll back
-            # Add protein data
+            # Add protein data first
             # accession values are now auto-generated; ignore CSV column
             protein = add_protein(
                 session,
@@ -113,15 +161,30 @@ def link_db_csv(mydata, session, dbinfo_path: Path | None = None):
                 # nothing further to link, move to next entry
                 session.rollback()
                 continue
-            
-            # gene = cds_addition(
-            #     session,
-            #     cdstype=cdstype,
-            #     dnaseq=dnaseq,
-            #     protein=protein,
-            # )
-            # logging.info(f"\nProtein record returned: {protein}")
-            # logging.info(f"Gene record returned: {gene}")
+
+            # Now handle CDS if dna_seq is valid
+            cds = None
+            if dnaseq and dnaseq.strip():
+                # Check if this CDS sequence already exists
+                existing_cds = session.query(Cds).filter(Cds.cds_seq == dnaseq).first()
+                if existing_cds:
+                    logging.warning(
+                        f"CDS sequence already exists (accession {existing_cds.cds_accession}); "
+                        f"skipping CDS addition to maintain 1:1 CDS-Protein relationship"
+                    )
+                    # Don't rollback, just skip CDS
+                else:
+                    # CDS is new, add it
+                    cds = add_cds(
+                        session,
+                        cdsseq=dnaseq,
+                        originseq=originseq,  # Optional origin sequence for engineered/modified genes
+                        protein=protein,
+                    )
+                    logging.info(f"\nCDS record returned: {cds}")
+            else:
+                logging.debug("No valid DNA sequence provided for this row; skipping CDS addition")
+                # Don't rollback, just skip CDS
 
             # Add name data
             # name = name_addition(session, protname=protname, protein=protein)
@@ -158,9 +221,26 @@ def link_db_csv(mydata, session, dbinfo_path: Path | None = None):
                 
                 if is_cds_db:
                     # This database links to CDS (genes)
-                    logging.debug(f"Database '{db_name}' is for CDS linking")
-                    # TODO: Link to CDS when CDS data is available
-                    # For now, this will be implemented when CDS is uncommented
+                    if cds:
+                        logging.debug(f"Database '{db_name}' is for CDS linking")
+                        # Create xref for this CDS database reference
+                        xref = session.query(Xref).filter(Xref.xref_acc_ext == db_acc).first()
+                        if not xref:
+                            xref = Xref(xref_acc_ext=db_acc, xref_db=xdb)
+                            session.add(xref)
+                            session.flush()
+                            logging.info(f"External reference {db_acc=} from database {db_name} added")
+                        
+                        # Link to CDS
+                        link_cds = session.query(CdsXref).filter_by(cds_id=cds.cds_id, xref_id=xref.xref_id).first()
+                        if not link_cds:
+                            link_cds = CdsXref(cds_id=cds.cds_id, xref_id=xref.xref_id)
+                            session.add(link_cds)
+                            session.flush()
+                            logging.info(f"Linked CDS {cds.cds_accession} <-> Xref {db_acc}")
+                        logging.info(f"\nExternal reference record returned for CDS: {xref}")
+                    else:
+                        logging.warning(f"Database '{db_name}' is for CDS linking but no CDS data available; skipping xref")
                 else:
                     # This database links to PROTEIN
                     logging.debug(f"Database '{db_name}' is for PROTEIN linking")
@@ -170,7 +250,7 @@ def link_db_csv(mydata, session, dbinfo_path: Path | None = None):
                         protein=protein,
                         xrefacc=db_acc,
                     )
-                    logging.info(f"\nExternal reference record returned: {xref}")
+                    logging.info(f"\nExternal reference record returned for PROTEIN: {xref}")
             
             # Commit the transaction after successful addition
             logging.info("Committing the session")
