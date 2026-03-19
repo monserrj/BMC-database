@@ -839,20 +839,6 @@ def add_xref(session, xdb, protein, xrefacc, cds=None):
         else:
             logger.debug("Skipping protein linkage because no protein provided.")
 
-        # # 3. Link to CDS (CdsXref)
-        # link_cds = (
-        #     session.query(CdsXref)
-        #     # Unsure about this?
-        #     .filter_by(cds==cds and xref==xref)
-        #     .first()
-        # )
-
-        # if not link_cds:
-        #     link_cds = Cds_xref(cds=cds, xref=xref)
-        #     session.add(link_cds)
-        #     print(f"Linked CDS {cds} <-> Xref {xref}")
-        # else:
-        #     print(f"CDS {cds} already linked to Xref {xref}")
         return xref  # Return the reference row we just added to the db/otherwise dealt with
     except Exception as exc:
         logger.exception("Failed to add xref %s for database %s", xrefacc, xdb)

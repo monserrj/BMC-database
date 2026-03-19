@@ -164,12 +164,24 @@ def link_db_csv(mydata, session, dbinfo_path: Path | None = None):
                 # Check if this CDS sequence already exists
                 existing_cds = session.query(Cds).filter(Cds.cds_seq == dnaseq).first()
                 if existing_cds:
-                    logging.warning(
-                        f"CDS sequence already exists (accession {existing_cds.cds_accession}); "
-                        f"skipping CDS addition to maintain 1:1 CDS-Protein relationship"
-                    )
-                    cds = existing_cds
-                    cds_target = existing_cds
+                    # Check if the existing CDS is linked to a different protein
+                    if existing_cds.prot_id != protein.id:
+                        # Find the protein that already has this CDS
+                        existing_protein = session.query(db.Protein).filter_by(id=existing_cds.prot_id).first()
+                        existing_prot_accession = existing_protein.cds_accession if existing_protein else "unknown"
+                        logging.error(
+                            f"Row {idx}: DNA sequence already exists and is linked to a different protein "
+                            f"(accession {existing_prot_accession}). Skipping this row to maintain 1:1 CDS-Protein relationship."
+                        )
+                        session.rollback()
+                        continue
+                    else:
+                        # Same protein (nique by seq, but reuse anyway)
+                        logging.info(
+                            f"This protein has another CDS sequence already linked, this one will be added too for this protein (accession {existing_cds.cds_accession})."
+                        )
+                        cds = existing_cds
+                        cds_target = existing_cds
                 else:
                     # CDS is new, add it
                     cds = add_cds(
