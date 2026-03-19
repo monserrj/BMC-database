@@ -14,6 +14,14 @@ from scripts import db, file_and_data, readfile
 LOGGER = logging.getLogger(__name__)
 
 @pytest.fixture
+def cleanup():
+    to_delete = []
+    yield to_delete
+    for item in to_delete:
+        if item.is_file():
+            item.unlink()
+
+@pytest.fixture
 def dbpath(request) -> Path:
     """Path to temporary database location
     
@@ -43,17 +51,20 @@ def output_add_minimal_protein_db(request) -> str:
     return (request.path.parent / "fixtures" / "outputs" / "protein" / "add_minimal_protein_data.sql").open().read()
 
 
-def test_make_new_db(dbpath: Path) -> None:
+def test_make_new_db(dbpath: Path, cleanup) -> None:
     """Confirm can create (and unlink) a new empty database."""
     assert not dbpath.is_file()
     db.create_db(dbpath)
     assert dbpath.is_file()
+
+    # Add database to cleanup
+    cleanup.append(dbpath)
+
     with dbpath.open("rb") as handle:
         magic = handle.read(16)
         assert magic == b"SQLite format 3\0"
-    dbpath.unlink()
 
-def test_add_minimal_protein_data(dbpath: Path, prot_minimal: Path, db_info: Path, output_add_minimal_protein_db) -> None:
+def test_add_minimal_protein_data(dbpath: Path, prot_minimal: Path, db_info: Path, output_add_minimal_protein_db, cleanup) -> None:
     """Add protein data to empty database"""
     # Create database and attach session
     assert not dbpath.is_file()
@@ -65,15 +76,15 @@ def test_add_minimal_protein_data(dbpath: Path, prot_minimal: Path, db_info: Pat
     data = readfile.read_file(prot_minimal, verbose=False)
     file_and_data.link_db_csv(data, session, db_info)
 
+    # Add database to cleanup
+    cleanup.append(dbpath)
+
     # Dump database and capture output
     result = subprocess.run(["sqlite3", str(dbpath), ".dump"], capture_output=True)
     assert result.stdout.decode("utf-8") == output_add_minimal_protein_db
    
-    # Unlink database
-    dbpath.unlink()
-
-def test_incorrect_structure_type(dbpath: Path, prot_incorrect_structure: Path, db_info:Path, caplog):
-    """If structure tpye is incorrect, an exception should be raised
+def test_incorrect_structure_type(dbpath: Path, prot_incorrect_structure: Path, db_info:Path, caplog, cleanup):
+    """If structure type is incorrect, an exception should be raised
     
     We are capturing the logging output to assert the appropriate message
     was logged
@@ -87,10 +98,12 @@ def test_incorrect_structure_type(dbpath: Path, prot_incorrect_structure: Path, 
     # Set logger warning level for capture
     caplog.set_level(logging.WARNING)
 
+    # Add database to cleanup
+    cleanup.append(dbpath)
+
     # Read and add protein data
     data = readfile.read_file(prot_incorrect_structure, verbose=False)
     file_and_data.link_db_csv(data, session, db_info)
     assert 'Skipping invalid struct type' in caplog.text
+    # assert "cashews" in caplog.text
 
-    # Unlink database
-    dbpath.unlink()
