@@ -15,7 +15,7 @@ from pathlib import Path  # for type hints
 from typing import Optional
 
 
-from enums import DatabaseType, StructProtType, enum_from_str
+from enums import DatabaseType, StructProtType, ModificationType, enum_from_str
 
 # Import  SQLAlchemy classes needed with a declarative approach.
 from sqlalchemy import (
@@ -27,7 +27,6 @@ from sqlalchemy import (
     ForeignKey,
     PrimaryKeyConstraint,
     UniqueConstraint,
-    String,
     or_,
     create_engine,
     func,
@@ -39,7 +38,7 @@ from sqlalchemy.orm import (
     mapped_column,
     sessionmaker,
 )
-
+from sqlalchemy.exc import IntegrityError
 import os
 from getpass import getpass
 
@@ -286,7 +285,7 @@ class Modification(Base):
     )  # Autopopulated ID for local table
     modification_description: Mapped[str] = mapped_column(nullable=False)
 
-    #    modification_type = Column(SQLEnum(ModificationType, name="modification_type_enum"), nullable=False)   # Not currently defined
+    modification_type: Mapped[Enum] = Column(Enum(ModificationType))
 
     # Introduce all relationship between tables:
     modifications: Mapped["CdsModification"] = relationship(
@@ -570,9 +569,10 @@ class Ppi_complex(Base):
 def add_protein(session, protseq, struct, canonical):
     """
     Args:
-    protseq (str): Protein sequence.
-    struct (str): Protein structure type.
-    canonical (boolean): Canonical if true, false if isoform
+        session: SQLAlchemy session
+        protseq (str): Protein sequence.
+        struct (str): Protein structure type.
+        canonical (boolean): Canonical if true, false if isoform
 
     Accessions are auto-generated in the format PRXXXX where XXXX is a
     zero-padded number derived from the protein's primary key. This ensures
@@ -602,41 +602,53 @@ def add_protein(session, protseq, struct, canonical):
         if protein:
             logger.info("Protein sequence already exists, returning existing accession %s", protein.prot_accession)
             return protein
+        else:
+            logger.debug(f"After query, {protein=}")
+            
+            # Enforce protein structure type
+            try:
+                struct = StructProtType[struct.upper()]
+            except KeyError:
+                logger.warning(
+                    "Skipping invalid struct type: %s", struct,
+                )
+                return None
 
-        logger.debug(f"After query, {protein=}")
+            # determine next accession number by looking at current max prot_id
+            max_id = session.query(func.coalesce(func.max(Protein.prot_id), 0)).scalar()
+            next_id = max_id + 1
+            accession = f"PR{next_id:04d}"
 
-        # Enforce protein structure type
-        try:
-            struct = StructProtType[struct.upper()]
-        except KeyError:
-            logger.warning(
-                "Skipping invalid struct type: %s", struct,
+            # create new protein with generated accession
+            protein = Protein(
+                prot_seq=protseq,
+                prot_accession=accession,
+                struct_prot_type=struct,
+                is_canonical=canonical,
             )
-            return None
+            session.add(protein)
+            session.flush()  # assign prot_id
+            logger.info("Generated accession %s for protein ID %s", protein.prot_accession, protein.prot_id)
 
-        # determine next accession number by looking at current max prot_id
-        max_id = session.query(func.coalesce(func.max(Protein.prot_id), 0)).scalar()
-        next_id = max_id + 1
-        accession = f"PR{next_id:04d}"
-
-        # create new protein with generated accession
-        protein = Protein(
-            prot_seq=protseq,
-            prot_accession=accession,
-            struct_prot_type=struct,
-            is_canonical=canonical,
-        )
-        session.add(protein)
-        session.flush()  # assign prot_id
-        logger.info("Generated accession %s for protein ID %s", protein.prot_accession, protein.prot_id)
-
-        return protein
+            return protein
     except Exception as exc:
-        logger.exception("Failed to add protein accession=%s", protacc)
+        logger.exception("Failed to add protein accession=%s", accession)
         logger.exception(exc)
         session.rollback()
         raise
 
+
+# Mapping of known databases to whether they link to CDS (True) or Protein (False)
+# CDS (genes): NCBI, NCBITAX, GO (when linked to genes)
+# Protein: Uniprot, KO (KEGG Orthology), PDB
+DATABASE_TARGETS = {
+    "NCBI": True,      # CDS
+    "NCBITAX": True,   # CDS
+    "GO": True,        # CDS
+    "Uniprot": False,  # PROTEIN
+    "KO": False,       # PROTEIN
+    "PDB": False,      # PROTEIN
+}
 
 # Function to add Xdatabase data 
 def add_xdatabase(session, xname, xurl=None, xtype=None, require_password=True):
@@ -692,7 +704,11 @@ def add_xdatabase(session, xname, xurl=None, xtype=None, require_password=True):
     if not require_password:
         # Add database directly without password (for trusted CSV sources)
         try:
-            xdb = Xdatabase(xref_db_name=xname, xref_db_url=xurl, xref_db_type=xtype)
+            xdb = Xdatabase(
+                xref_db_name=xname,
+                xref_db_url=xurl,
+                xref_db_type=xtype,
+            )
             session.add(xdb)
             session.flush()
             logger.info("Database '%s' added from trusted source", xname)
@@ -726,9 +742,15 @@ def add_xdatabase(session, xname, xurl=None, xtype=None, require_password=True):
                     valid = [e.name for e in DatabaseType]
                     logger.error("Invalid database type '%s' (must be one of %s)", xtype_str, valid)
                     return None
+            target_str = input("Link to CDS (gene) or Protein? [CDS/Protein]: ").strip().upper()
+            # Note: This is only used at import time, not stored in database
 
         try:
-            xdb = Xdatabase(xref_db_name=xname, xref_db_url=xurl, xref_db_type=xtype)
+            xdb = Xdatabase(
+                xref_db_name=xname,
+                xref_db_url=xurl,
+                xref_db_type=xtype,
+            )
             session.add(xdb)
             session.flush()
 
@@ -817,20 +839,6 @@ def add_xref(session, xdb, protein, xrefacc, cds=None):
         else:
             logger.debug("Skipping protein linkage because no protein provided.")
 
-        # # 3. Link to CDS (CdsXref)
-        # link_cds = (
-        #     session.query(CdsXref)
-        #     # Unsure about this?
-        #     .filter_by(cds==cds and xref==xref)
-        #     .first()
-        # )
-
-        # if not link_cds:
-        #     link_cds = Cds_xref(cds=cds, xref=xref)
-        #     session.add(link_cds)
-        #     print(f"Linked CDS {cds} <-> Xref {xref}")
-        # else:
-        #     print(f"CDS {cds} already linked to Xref {xref}")
         return xref  # Return the reference row we just added to the db/otherwise dealt with
     except Exception as exc:
         logger.exception("Failed to add xref %s for database %s", xrefacc, xdb)
@@ -838,57 +846,200 @@ def add_xref(session, xdb, protein, xrefacc, cds=None):
         session.rollback()
         raise
 
-# # Function to add CDS data
-# def add_cds(session, cdsseq, cdsaccession, cdsorigin, protein):
 
-#     ''' Args:
-#     cdsseq (str): Gene DNA sequence.
-#     cdsaccession: (str) Unique accession number CDS
-#     cds_origin (str): Original CDS sequence if the sequence is modified.
-#     protein: Protein information added with add_protein function
 
-#     Explanation on how the code works:
-#     1. Check if the cds already exists,  store it in the `cds` variable
-#     2. If the cds does not exist, create a new cds object and add it to the
-#        session
-#     3. Check if the cds is already associated with the protein, and if not
-#        create a new `proteingene` object and add it to the session
-#     4. Commit the session to the database
-#     '''
+# Function to add CDS data
+def add_cds(session, cdsseq, originseq, protein):
+    """Add a CDS (Coding DNA Sequence) record to the database.
 
-#     print(f"\nNow in {add_cds.__name__}")
+    Args:
+        session: SQLAlchemy session
+        cdsseq (str): Gene DNA sequence (potentially modified)
+        originseq (str): Original CDS sequence if engineered/modified (optional)
+        protein: Protein ORM object this CDS encodes
 
-#     print(f"Before query, {cdsseq[:10]=}...,{cdsaccession=} {cdsorigin=}")
+    Accessions are auto-generated in the format CDXXXX where XXXX is a
+    zero-padded number derived from the CDS's primary key.
 
-#     # Create a new cds object
-#     cds = (
-#         session.query(Cds)
-#         .filter(Cds.cds_seq == cdsseq)
-#         .first()
-#     )
-#     print(f"After query, {cds=}")
+    If originseq is provided and differs from cdsseq:
+    - Creates/retrieves both original and modified CDS records
+    - Links them via Origin_cds table
+    If originseq is None or same as cdsseq:
+    - Creates only the current CDS record
 
-#     # Add cds if it is not already present
-#     if not cds:
-#         print(f"Before adding seq and accession {cds=}")
-#         cds = Cds(
-#             cds_seq=cdsseq,
-#             cds_accession=cdsaccession,
-#             protein=protein, # Use relationship not FK directly
-#             origin=cdsorigin) # Use relationship not FK directly
-#         print(f" After adding seq and accession{cds=}")
-#         print(f"{protein.prot_id=}, {cds.cds_id=}, {cds.prot_id}")
-#         print(f"{protein.cdss=}")
-#         session.add(cds)
-#         session.flush()
-#         print(f"Cds {cdsseq[:10]=} with accession {cdsaccession=} added")
-#     else:
-#         print(f"This CDS {cdsseq[:10]=} with accession {cdsaccession=} has already being added")
+    Explanation on how the code works:
+    1. Check if the current CDS sequence already exists
+    2. If it exists, return existing CDS
+    3. If originseq provided and different from cdsseq:
+       a. Find or create the origin CDS
+       b. Create the modified CDS
+       c. Link them via Origin_cds table
+    4. Else: Create only the current CDS
+    5. Return the CDS row
+    """
+    logger.debug(f"\nNow in {add_cds.__name__}")
+    logger.debug(f"Before query, {cdsseq[:10]=}..., {originseq[:10] if originseq else None}..., {protein=}")
 
-#     print(f"Cds row returned: {cds}")
+    try:
+        # First check if the current sequence already exists
+        cds = session.query(Cds).filter(Cds.cds_seq == cdsseq).first()
+        if cds:
+            logger.info("CDS sequence already exists, returning existing accession %s", cds.cds_accession)
+            return cds
 
-#     return cds  # Return the cds row we just added to the db/otherwise dealt with
+        logger.debug(f"After query, {cds=}")
 
+        # Handle origin sequence if provided and different from current sequence
+        origin_cds = None
+        if originseq and originseq.strip() and originseq != cdsseq:
+            logger.debug("CDS has origin sequence, processing origin")
+            # Find or create the origin CDS
+            origin_cds = session.query(Cds).filter(Cds.cds_seq == originseq).first()
+            if not origin_cds:
+                # Create origin CDS with same protein
+                max_id = session.query(func.coalesce(func.max(Cds.cds_id), 0)).scalar()
+                origin_accession = f"CD{max_id + 1:04d}"
+                origin_cds = Cds(
+                    cds_seq=originseq,
+                    cds_accession=origin_accession,
+                    prot_id=protein.prot_id,
+                )
+                session.add(origin_cds)
+                session.flush()
+                logger.info("Created origin CDS with accession %s", origin_cds.cds_accession)
+            else:
+                logger.info("Origin CDS already exists with accession %s", origin_cds.cds_accession)
+
+        # Determine next accession number for the modified CDS
+        max_id = session.query(func.coalesce(func.max(Cds.cds_id), 0)).scalar()
+        next_id = max_id + 1
+        accession = f"CD{next_id:04d}"
+
+        # Create new CDS with generated accession
+        cds = Cds(
+            cds_seq=cdsseq,
+            cds_accession=accession,
+            prot_id=protein.prot_id,
+        )
+        session.add(cds)
+        session.flush()  # assign cds_id
+
+        logger.info("Generated accession %s for CDS ID %s", cds.cds_accession, cds.cds_id)
+
+        # Link origin to modified if origin exists
+        if origin_cds:
+            try:
+                origin_link = Origin_cds(
+                    origin_id=origin_cds.cds_id,
+                    modified_id=cds.cds_id,
+                )
+                session.add(origin_link)
+                session.flush()
+                logger.info(
+                    "Linked origin CDS %s (ID %s) to modified CDS %s (ID %s)",
+                    origin_cds.cds_accession,
+                    origin_cds.cds_id,
+                    cds.cds_accession,
+                    cds.cds_id,
+                )
+            except IntegrityError as e:
+                logger.warning("Origin-modified CDS link already exists: %s", e)
+                session.rollback()
+
+        logger.debug(f"CDS row returned: {cds}")
+        return cds
+    except Exception as exc:
+        logger.exception("Failed to add CDS with sequence=%s", cdsseq[:10])
+        logger.exception(exc)
+        session.rollback()
+        raise
+# Add the add_modification function
+def add_modification(session, modif_descrip, modif_type, cds):
+    """
+    Adds or retrieves a modification and associates it with a CDS.
+    
+    Args:
+        session: SQLAlchemy session
+        modif_descrip (str): Description of the modification.
+        modif_type (str): Type of modification (e.g., truncated, extended, fusion, synthetic, mutated, domesticated).
+        cds: CDS object to associate with the modification.
+        
+    Returns:
+        CdsModification object representing the link between CDS and modification.
+        
+    Explanation on how the code works:
+    1. Check if a modification with the same description and type already exists.
+    2. If it exists, retrieve its ID; if not, create a new modification record.
+    3. Check if the link between the CDS and modification already exists in cds_modification.
+    4. If the link does not exist, create a new record to associate the CDS with the modification.
+    5. Flush and return the link.
+    """
+    logger.debug(f"\nNow in {add_modification.__name__}")
+    logger.debug(f"Before query, {modif_descrip=}, {modif_type=}, {cds=}")
+    
+    try:
+        # Skip if no description provided
+        if not modif_descrip or not modif_type:
+            logger.debug("Skipping modification: description or type is missing")
+            return None
+        
+        # Enforce modification type enum conversion first
+        try:
+            modif_type_enum = ModificationType[modif_type.strip().upper()]
+        except KeyError:
+            valid = [e.name for e in ModificationType]
+            logger.warning(
+                "Invalid modification type '%s' (must be one of %s)",
+                modif_type,
+                valid,
+            )
+            return None
+        
+        # Check if modification already exists
+        modification = session.query(Modification).filter(
+            Modification.modification_description == modif_descrip,
+        ).first()
+        
+        if modification:
+            logger.info(f"Modification already exists with ID {modification.modification_id}")
+        else:
+            # Create new modification record
+            modification = Modification(
+                modification_description=modif_descrip,
+                modification_type=modif_type_enum
+            )
+            session.add(modification)
+            session.flush()
+            logger.info(f"Added new modification with ID {modification.modification_id}")
+        
+        # Now link modification to CDS in cds_modification
+        cds_mod_link = session.query(CdsModification).filter(
+            CdsModification.cds_id == cds.cds_id,
+            CdsModification.modification_id == modification.modification_id
+        ).first()
+        
+        if cds_mod_link:
+            logger.info(f"CDS-modification link already exists")
+        else:
+            try:
+                cds_mod_link = CdsModification(
+                    cds_id=cds.cds_id,
+                    modification_id=modification.modification_id
+                )
+                session.add(cds_mod_link)
+                session.flush()
+                logger.info(f"Linked CDS {cds.cds_accession} to modification '{modif_descrip}'")
+            except IntegrityError as e:
+                logger.warning("CDS-modification link already exists: %s", e)
+                session.rollback()
+        
+        return cds_mod_link
+        
+    except Exception as exc:
+        logger.exception("Failed to add modification with description=%s", modif_descrip)
+        logger.exception(exc)
+        session.rollback()
+        raise
 
 # # Function to add name data 
 # def add_name(session, protname, protein):
@@ -946,6 +1097,92 @@ def add_xref(session, xdb, protein, xrefacc, cds=None):
 #         print(f"Linked name from protein: {proteingene.gene}")
 
 #         return name  # Return the gene row we just added to the db/otherwise dealt with
+
+
+# Add modification support
+def add_modification(session, modif_descrip, modif_type, cds):
+    """Add or retrieve a modification and link it to a CDS.
+
+    Args:
+        session: SQLAlchemy session
+        modif_descrip: Human-readable modification description.
+        modif_type: Modification type string (must match ModificationType enum).
+        cds: CDS ORM object to link the modification to.
+
+    Returns:
+        CdsModification ORM object (link), or None if it could not be created.
+    """
+
+    logger.debug(f"\nNow in {add_modification.__name__}")
+
+    try:
+        if not modif_descrip or not modif_type or not cds:
+            logger.debug("Skipping modification: missing description/type/CDS")
+            return None
+
+        try:
+            modif_type_enum = ModificationType[modif_type.strip().upper()]
+        except KeyError:
+            valid = [e.name for e in ModificationType]
+            logger.warning(
+                "Invalid modification type '%s' (must be one of %s)",
+                modif_type,
+                valid,
+            )
+            return None
+
+        modification = (
+            session.query(Modification)
+            .filter(
+                Modification.modification_description == modif_descrip,
+                Modification.modification_type == modif_type_enum,
+            )
+            .first()
+        )
+
+        if modification:
+            logger.info("Modification already exists with ID %s", modification.modification_id)
+        else:
+            modification = Modification(
+                modification_description=modif_descrip,
+                modification_type=modif_type_enum,
+            )
+            session.add(modification)
+            session.flush()
+            logger.info("Added new modification with ID %s", modification.modification_id)
+
+        cds_mod_link = (
+            session.query(CdsModification)
+            .filter(
+                CdsModification.cds_id == cds.cds_id,
+                CdsModification.modification_id == modification.modification_id,
+            )
+            .first()
+        )
+
+        if cds_mod_link:
+            logger.info("CDS-modification link already exists")
+            return cds_mod_link
+
+        cds_mod_link = CdsModification(
+            cds_id=cds.cds_id,
+            modification_id=modification.modification_id,
+        )
+        session.add(cds_mod_link)
+        session.flush()
+        logger.info(
+            "Linked CDS %s to modification '%s'",
+            cds.cds_accession,
+            modif_descrip,
+        )
+        return cds_mod_link
+
+    except Exception as exc:
+        logger.exception("Failed to add modification with description=%s", modif_descrip)
+        logger.exception(exc)
+        session.rollback()
+        raise
+
 
 #######################################################
 # (4) Helper functions that use the definitions to
