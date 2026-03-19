@@ -1,2 +1,25 @@
+[project]
+name = "microcomp_db"
+version = "0.1"
+authors = [{ name = "Julia Monserrat Relaño" }]
+description = "A database to assist engineering bacterial microcompartment"
+readme = "README.md"
+requires-python = ">=3.13"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = ["sqlalchemy", "click"]
+
 [mypy]
 plugins = "sqlalchemy.ext.mypy.plugin"
+
+[tool.setuptools.packages.find]
+include = ["scripts"]
+
+[project.scripts]
+"microcomp_db" = "scripts.microcomp_db:main"
+
+[project.urls]
+homepage = "https://github.com/monserrj/BMC-database"
+source = "https://github.com/monserrj/BMC-database"
+issues = "https://github.com/monserrj/BMC-database/issues"
+documentation = "https://github.com/monserrj/BMC-database/blob/master/docs/README.md"

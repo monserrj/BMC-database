@@ -16,9 +16,9 @@ import click
 
 # Import the database file, csv and the data addition file to create
 # and populate database
-from db import create_db, get_session
-from readfile import read_file
-from file_and_data import link_db_csv
+from .db import create_db, get_session
+from .readfile import read_file
+from .file_and_data import link_db_csv
 
 
 @click.command()
