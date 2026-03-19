@@ -71,8 +71,6 @@ def main(dbpath: Path, csvpath: Path, dbinfo: Path, force: bool, verbose: bool):
     create_db(dbpath)  # Pass Path object, not URL string
     session = get_session(dbpath)  # Pass Path object, not URL string
 
-    return
-
     # Read CSV file to import data
     logging.info(f"\nReading CSV file: {csvpath}")
     data = read_file(csvpath, verbose)
