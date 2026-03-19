@@ -15,7 +15,7 @@ from pathlib import Path  # for type hints
 from typing import Optional
 
 
-from enums import DatabaseType, StructProtType, ModificationType, enum_from_str
+from .enums import DatabaseType, StructProtType, ModificationType, enum_from_str
 
 # Import  SQLAlchemy classes needed with a declarative approach.
 from sqlalchemy import (

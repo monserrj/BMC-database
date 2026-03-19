@@ -8,7 +8,7 @@ followed and explanations kept to help following through
 import logging
 from pathlib import Path
 
-from db import (
+from .db import (
     Xdatabase,
     add_protein,
     add_cds,
@@ -21,7 +21,7 @@ from db import (
     DATABASE_TARGETS,
     add_modification,
 )
-from readfile import read_file
+from .readfile import read_file
 
 # To make boolean values from the csv true booleans:
 def parse_bool(value):
