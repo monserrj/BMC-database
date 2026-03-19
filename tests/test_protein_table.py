@@ -5,10 +5,13 @@ These tests should be run from the repository root using pytest -v
 
 from pathlib import Path
 
+import logging
 import pytest
 import subprocess
 
 from scripts import db, file_and_data, readfile
+
+LOGGER = logging.getLogger(__name__)
 
 @pytest.fixture
 def dbpath(request) -> Path:
@@ -22,6 +25,12 @@ def dbpath(request) -> Path:
 def prot_minimal(request) -> Path:
     """Path to minimal protein data"""
     return request.path.parent / "fixtures" / "protein" / "prot_data_minimal_correct.csv"
+
+@pytest.fixture
+def prot_incorrect_structure(request) -> Path:
+    """Path to minimal protein data with incorrect structure"""
+    return request.path.parent / "fixtures" / "protein" / "prot_data_structype_changed_enum.csv"
+
 
 @pytest.fixture
 def db_info(request) -> Path:
@@ -60,5 +69,28 @@ def test_add_minimal_protein_data(dbpath: Path, prot_minimal: Path, db_info: Pat
     result = subprocess.run(["sqlite3", str(dbpath), ".dump"], capture_output=True)
     assert result.stdout.decode("utf-8") == output_add_minimal_protein_db
    
+    # Unlink database
+    dbpath.unlink()
+
+def test_incorrect_structure_type(dbpath: Path, prot_incorrect_structure: Path, db_info:Path, caplog):
+    """If structure tpye is incorrect, an exception should be raised
+    
+    We are capturing the logging output to assert the appropriate message
+    was logged
+    """
+    # Create database and attach session
+    assert not dbpath.is_file()
+    db.create_db(dbpath)
+    assert dbpath.is_file()
+    session = db.get_session(dbpath)
+
+    # Set logger warning level for capture
+    caplog.set_level(logging.WARNING)
+
+    # Read and add protein data
+    data = readfile.read_file(prot_incorrect_structure, verbose=False)
+    file_and_data.link_db_csv(data, session, db_info)
+    assert 'Skipping invalid struct type' in caplog.text
+
     # Unlink database
     dbpath.unlink()
