@@ -1,23 +1,34 @@
-_Please include a summary of the change and/or which issue is fixed. Please also include the motivation and context, and note the tests that apply to these changes._
+Please include a summary of the changes in your pull request.
+
+If you are fixing/resolving an issue, please state which issue is fixed with text like `fixes #4` or similar (this will be picked up automatically by GitHub and helps us manage development).
+
+Please also include the motivation and context, and note the tests that apply to these changes.
+
+Add an `X` to the boxes below as appropriate.
 
 ## Type of change
 
-- [ ] Correction (change to existing text/content)
-- [ ] New content (new text, image, or folder/subfolder)
-- [ ] Breaking change (change that might cause incompatibility with a previous version of the repository)
+- [ ] Bug fix (non-breaking change that fixes an issue)
+- [ ] New feature (non-breaking change that adds functionality)
+- [ ] Breaking change (fix or feature that would cause existing functionality not to work as expected)
 - [ ] This change requires a documentation update
 - [ ] This is a documentation update
 
 ## Action Checklist
 
 - [ ] Work on a single issue/concept (if there are multiple separate issues to address, please use a separate pull request for each)
-- [ ] Fork the `template_bioinformatics_project` repository under your own account (please [allow write access for repository maintainers](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/working-with-forks/allowing-changes-to-a-pull-request-branch-created-from-a-fork))
+- [ ] Fork the `BMC-database` repository under your own account (please [allow write access for repository maintainers](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/working-with-forks/allowing-changes-to-a-pull-request-branch-created-from-a-fork))
+- [ ] Set up an appropriate development environment
 - [ ] Create a new branch with a short, descriptive name
 - [ ] Work on this branch
   - [ ] style guidelines have been followed
+  - [ ] new code is commented, especially in hard-to-understand areas
   - [ ] corresponding changes to documentation have been made
+  - [ ] tests for the change have been added that demonstrate the fix or feature works
+- [ ] Test locally with `pytest -v` **non-passing code will not be merged**
 - [ ] Rebase against `origin/master`
+- [ ] Check changes with linting/formatting tools before submission
 - [ ] Commit branch
 - [ ] Submit pull request, describing the content and intent of the pull request
 - [ ] Request a code review
-- [ ] Continue the discussion at [`Pull requests` page](https://github.com/sipbs-compbiol/template_bioinformatics_project/pulls) of the repository
+- [ ] Continue the discussion at [`Pull requests` section](https://github.com/monserrj/BMC-database/pulls) in the `BMC-database` repository
