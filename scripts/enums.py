@@ -5,6 +5,7 @@ followed and explanations kept to help following through
 
 '''
 from enum import Enum, unique
+import logging
 # All Enum values as they are constant should be capitalised for good practice
 # https://realpython.com/python-enum/
 
@@ -68,17 +69,17 @@ class ComplexSource(Enum):
 # ---- Testing ----
 
 if __name__ == "__main__":
-    print("Testing DatabaseType Enum...\n")
+    logging.info("Testing DatabaseType Enum...\n")
 
     # List all members for testing this works. Remove after
     for db_type in ModificationType:
-        print(f"{db_type.name} = {db_type.value}")
+        logging.info(f"{db_type.name} = {db_type.value}")
 
-    print("\nTesting helper function:")
-    print("\nDatabaseType tests:")
+    logging.info("\nTesting helper function:")
+    logging.info("\nDatabaseType tests:")
     for label in ["BMC-H", "MUTATED", " fuse ", "FUSION", "invalid"]:
         try:
             result = enum_from_str(ModificationType, label)
-            print(f"{label!r} -> {result}")
+            logging.info(f"{label!r} -> {result}")
         except ValueError as e:
-            print(f"{label!r} -> Error: {e}")
+            logging.error(f"{label!r} -> Error: {e}")

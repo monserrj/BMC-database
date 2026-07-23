@@ -21,6 +21,13 @@ tutorial1 = Tutorial(
 )
 tutorial1.save()  # Insert the new tutorial
 
+tutorial2 = Tutorial()
+tutorial2.author = "Alex"
+tutorial2.contributors = ["Aldren", "Jon", "Joanna"]
+tutorial2.url = "https://realpython.com/convert-python-string-to-int/"
+tutorial2.save()
+
+
 # Retrieving all documents and print their title
 for doc in Tutorial.objects:
     print(doc.title)
