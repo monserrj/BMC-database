@@ -13,7 +13,7 @@ from db import (
     add_protein,
     add_cds,
     Cds,
-    # name_addition,
+    add_name,
     add_xref,
     add_xdatabase,
     Xref,
@@ -156,7 +156,14 @@ def link_db_csv(mydata, session, dbinfo_path: Path | None = None):
                 # nothing further to link, move to next entry
                 session.rollback()
                 continue
-
+            # Add name info
+            name = add_name(session, protname=name, protein=protein)
+            logging.info(f"Name record returned: {name}")
+            if name is None:
+                logging.warning("Skipping row due to failed name insertion: %5s", name)
+                session.rollback()
+                continue
+            
             # Now handle CDS if dna_seq is valid
             cds = None
             cds_target = None

@@ -1041,63 +1041,72 @@ def add_modification(session, modif_descrip, modif_type, cds):
         session.rollback()
         raise
 
-# # Function to add name data 
-# def add_name(session, protname, protein):
+# Function to add name data 
+def add_name(session, protname, protein):
 
-#     ''' Args:
-#     protname (str): Protein name.
-#     protein: Protein information added with add_protein function
+    ''' Args:
+    session: SQLAlchemy session to the database
+    protname (str): Protein name.
+    protein: Protein information added with add_protein function
 
-#     Explanation on how the code works:
-#     1. Check if the name already exists,  store it in the `name` variable
-#     2. If the name does not exist, create a new name object and add it to the
-#        session
-#     3. Check if the name is already associated with the protein, and if not
-#        create a new `proteinname` object and add it to the session
-#     4. Commit the session to the database
-#     '''
+    Explanation on how the code works:
+    1. Check if the name already exists,  store it in the `name` variable
+    2. If the name does not exist, create a new name object and add it to the
+       session
+    3. Check if the name is already associated with the protein, and if not
+       create a new `proteinname` object and add it to the session
+    4. Commit the session to the database
+    '''
 
-#     print(f"\nNow in {add_name.__name__}")
+    logging.debug(f"\nNow in {add_name.__name__}")
+    logging.debug(f"Before query, {protname=}")
+    with session.no_autoflush:
+        try:
 
-#     with session.no_autoflush:
-#         print(f"Before query, {protname=}")
+            # Create a new name object
+            name = (
+                session.query(Name)
+                .filter(Name.prot_name == protname)
+                .first()
+            )
+            logging.debug(f"After query, {name=}")
 
-#         # Create a new name object
-#         name = (
-#             session.query(Name)
-#             .filter(Name.prot_name == protname)
-#             .first()
-#         )
-#         print(f"After query, {name=}")
+            # Add name if it is not already present
+            if name:
+                logger.info(f"Name {protname=} already exists")
+                return name
+            else:
+                logger.debug(f"After query, {name=}")
+                name = Name(prot_name=protname)
+                session.add(name)
+                session.flush()
+                logging.info(f"Name {protname=} added")
+            logging.info(f"Name row returned: {name}")
+            
+            # Link to Protein
+            if name is not None and protein is not None:
+                link_prot = (
+                    session.query(ProteinName)
+                    .filter_by(prot_id=protein.prot_id, name_id=name.name_id)
+                    .first()
+                )
 
-#         # Add name if it is not already present
-#         if not name:
-#             name = Name(prot_name=protname)
-#             session.add(name)
-#             session.flush()
-#             print(f"Name {protname=} added")
-#         else:
-#             print(f"This name {protname} has already being added")
-#         print(f"Name row returned: {name}")
-
-#         print(f"{name.proteins=}, {type(name.proteins)}")
-
-#         if name not in name.proteins:
-#             proteinname = ProteinName()
-#             proteinname.name = name
-#             protein.names.append(proteinname)
-#             print(f"{name.proteins=}")
-#             print(f"\nLinked name {name.name_id} to Protein {protein.prot_id}")
-#             print(f"{proteinname=}")
-#         else:
-#             print(
-#                 f"Name {name.name_id} is already linked to Protein {protein.prot_id}"
-#             )
-#         print(f"{name}")
-#         print(f"Linked name from protein: {proteingene.gene}")
-
-#         return name  # Return the gene row we just added to the db/otherwise dealt with
-
+                if not link_prot:
+                    link_prot = ProteinName(prot_id=protein.prot_id, name_id=name.name_id)
+                    session.add(link_prot)
+                    session.flush()
+                    logging.info(f"Linked Protein {protein} <-> Name {name} (flush assigned link_prot={link_prot})")
+                
+            else:
+                    logging.info(
+                    f"Name {name.name_id} is already linked to Protein {protein.prot_id}"
+                )
+            return name  # Return the gene row we just added to the db/otherwise dealt with
+        except Exception as exc:
+            logging.exception("Failed to add name %s", protname)
+            logging.exception(exc)
+            session.rollback()
+            raise
 
 # Add modification support
 def add_modification(session, modif_descrip, modif_type, cds):
@@ -1257,22 +1266,3 @@ if __name__ == "__main__":
     #from eralchemy import render_er
 
     # render_er(Base, "er_diagram.pdf")
-
-## How to populate parent child relationships for CDS
-# Suppose we have CDS with the following relationships
-#
-# seq        acc     parent
-# ATG...TAC  CDS_1   NULL
-# ATG...TAC  CDS_2   CDS_1
-# ATG...TAC  CDS_3   CDS_2
-#
-# We'd parse/populate (in a function) as follows:
-#
-# line 1
-#  add CDS acc, CDS seq, and because parent is NULL, origin_cds is NULL
-# line 2
-#  as parent is CDS_1, query Cds table to get cds_id corresponding to CDS_1 (call this ID*)
-#  add CDS acc, CDS seq, and ID* (as parent)
-# line 3
-#  as parent is CDS_2, query Cds table to get cds_id corresponding to CDS_2 (call this ID**)
-#  add CDS acc, CDS seq, and ID** (as parent)
