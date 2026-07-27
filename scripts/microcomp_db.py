@@ -56,7 +56,6 @@ def main(dbpath: Path, csvpath: Path, dbinfo: Path, force: bool, verbose: bool):
     
     dbpath = dbpath.resolve()
     
-    """Main function to run the script."""
     # Create the database if it doesn't exist, or we're forcing overwrite
     if force is True and dbpath.exists():  # overwrite database
         logging.info(f"\nOverwriting {dbpath}")
