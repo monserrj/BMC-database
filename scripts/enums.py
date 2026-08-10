@@ -65,6 +65,12 @@ class ComplexSource(Enum):
     PREDICTED = "PREDICTED"
     THEORETICAL = "THEORETICAL" # same than predicted? need to describe differences
 
+@unique
+class InteractStatus(Enum):
+    """Enum for classifying the status of protein interactions."""
+    INTERACTS = "INTERACTS"
+    NO_INTERACTION_DETECTED = "NO_INTERACTION_DETECTED"
+
 # ---- Testing ----
 
 if __name__ == "__main__":
