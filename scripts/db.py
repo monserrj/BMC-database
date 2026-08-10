@@ -645,6 +645,7 @@ def add_complex(
             composition_key=composition_key,
             is_active=is_active,
             is_exp_tested=is_exp_tested,
+
         )
 
         new_complex.proteins = [
