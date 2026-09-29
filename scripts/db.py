@@ -651,7 +651,7 @@ DATABASE_TARGETS = {
 }
 
 # Function to add Xdatabase data 
-def add_xdatabase(session, xname, xurl=None, xtype=None, require_password=True):
+def add_xdatabase(session, xname, xurl=None, xtype=None):
 
 #     ''' Args:
 #     session: SQLAlchemy session to the database
@@ -662,7 +662,7 @@ def add_xdatabase(session, xname, xurl=None, xtype=None, require_password=True):
 
 #     Explanation on how the code works:
 #     1. Check if the database already exists,  store it in the `xdb` variable
-#     2. If the database does not exist, check that this new database typews added (Y/N) questions
+#     2. If the database does not exist, check that this new database types added (Y/N) questions
 #     3. If yes, create a new db object and add it to the session
 #     4. Commit the session to the database
 #     '''
@@ -701,71 +701,6 @@ def add_xdatabase(session, xname, xurl=None, xtype=None, require_password=True):
             )
             return None
 
-    if not require_password:
-        # Add database directly without password (for trusted CSV sources)
-        try:
-            xdb = Xdatabase(
-                xref_db_name=xname,
-                xref_db_url=xurl,
-                xref_db_type=xtype,
-            )
-            session.add(xdb)
-            session.flush()
-            logger.info("Database '%s' added from trusted source", xname)
-            return xdb
-        except Exception as exc:
-            logger.exception("Failed to add database '%s' — rolling back", xname)
-            session.rollback()
-            raise
-
-    # Insert new database (requires password and may need additional info)
-    logger.info("This external database %s does not exist, to add to database provide password", xname)
-    password = getpass("Password: ")
-    expected_password = os.getenv("DB_ADD_PASSWORD")
-
-    if expected_password is None:
-        # how to set password: export DB_ADD_PASSWORD="..."
-        logger.error("Environment variable DB_ADD_PASSWORD is not set")
-        return None
-
-    if password == expected_password:
-        # Password correct, now check if we need additional information
-        if not xurl or not xtype:
-            logger.info("Database '%s' approved. Please provide additional information:", xname)
-            if not xurl:
-                xurl = input("URL: ").strip()
-            if not xtype:
-                xtype_str = input("Type (Sequence/Structure/Function/Taxonomy): ").strip()
-                try:
-                    xtype = DatabaseType[xtype_str.upper()]
-                except KeyError:
-                    valid = [e.name for e in DatabaseType]
-                    logger.error("Invalid database type '%s' (must be one of %s)", xtype_str, valid)
-                    return None
-            target_str = input("Link to CDS (gene) or Protein? [CDS/Protein]: ").strip().upper()
-            # Note: This is only used at import time, not stored in database
-
-        try:
-            xdb = Xdatabase(
-                xref_db_name=xname,
-                xref_db_url=xurl,
-                xref_db_type=xtype,
-            )
-            session.add(xdb)
-            session.flush()
-
-            logger.info("Database '%s' successfully added", xname)
-            return xdb
-
-        except Exception as exc:
-            logger.exception("Failed to add database '%s' — rolling back", xname)
-            logger.exception(exc)
-            session.rollback()
-            raise
-
-    else:
-        logger.warning("Incorrect password provided, database '%s' not added", xname)
-        return None
 
 # Function to add xref data and linking to cds and protein
 def add_xref(session, xdb, protein, xrefacc, cds=None):
