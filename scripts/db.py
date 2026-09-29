@@ -88,6 +88,7 @@ class Protein(Base):
         default=True
     )  # True/False flag for whether this protein is canonical
     struct_prot_type: Mapped[Optional[Enum]] = Column(Enum(StructProtType))
+    prot_comments: Mapped[Optional[str]] = mapped_column(nullable=True)  # Optional comments about the protein
 
     # Define relationships to other tables in Declarative
     references: Mapped["ProteinXref"] = relationship(back_populates="protein")
@@ -131,7 +132,7 @@ class Xdatabase(Base):
     )  # Local id for database
     xref_db_name: Mapped[str] = mapped_column(nullable=False, unique=True)  # Database name
     xref_db_type: Mapped[Enum] = Column(Enum(DatabaseType))  # Database type (sequence, structure, function, taxonomy)
-    xref_db_url: Mapped[Optional[str]] = mapped_column(nullable=False, unique=True)  # Database URL
+    xref_href: Mapped[Optional[str]] = mapped_column(nullable=False, unique=True)  # Database URL
     
     # Define relationships using Declarative
     xref: Mapped[list["Xref"]] = relationship(back_populates="xref_db")
@@ -204,6 +205,7 @@ class Cds(Base):
         nullable=False, unique=True
     )  # Unique accession number for CD
     prot_id: Mapped[int] = mapped_column(ForeignKey("protein.prot_id"), nullable=False)
+    cds_comments: Mapped[Optional[str]] = mapped_column(nullable=True)  # Optional comments about the CDS
 
     # Introduce all relationship between tables: Check this?
     protein: Mapped["Protein"] = relationship(back_populates="cds")
