@@ -596,9 +596,12 @@ def add_protein(session, protseq, struct, canonical):
                 is_canonical=canonical,
             )
             session.add(protein)
-            session.flush()  # assign prot_id
-            logger.info("Generated accession %s for protein ID %s", protein.prot_accession, protein.prot_id)
-
+            session.flush()  # This sends the changes to the database, so prot_id is assigned
+            logger.info(
+                "Protein %s added with accession %s",
+                protein.prot_id,
+                protacc,
+            )
             return protein
     except Exception as exc:
         logger.exception("Failed to add protein accession=%s", accession)
@@ -606,91 +609,9 @@ def add_protein(session, protseq, struct, canonical):
         session.rollback()
         raise
 
-# Make composition key so we can sort complex and then ensure uniqueness of complex composition. This is a helper function for add_complex.
-def make_composition_key(protein_ids: list[int]) -> str:
-    """Create an order-independent key for a complex composition."""
 
-    if not protein_ids:
-        raise ValueError(
-            "A complex must contain at least one protein."
-        )
-
-    if len(protein_ids) != len(set(protein_ids)):
-        raise ValueError(
-            "The same protein cannot be listed more than once "
-            "in a complex."
-        )
-
-    sorted_ids = sorted(protein_ids)
-
-    return "-".join(str(prot_id) for prot_id in sorted_ids)
-
-# Function to add complex (MUST BE TESTED)
-def add_complex(
-    session,
-    complex_accession: str,
-    complex_type: str,
-    protein_ids: list[int],
-    is_active: Optional[bool] = None,
-    is_exp_tested: Optional[bool] = None,
-):
-    composition_key = make_composition_key(protein_ids)
-
-    existing_complex = session.scalar(
-        select(Complex).where(
-            Complex.composition_key == composition_key
-        )
-    )
-    try:
-        if existing_complex is not None:
-            raise ValueError(
-                f"This protein combination already exists as "
-                f"complex {existing_complex.complex_accession}."
-            )
-
-        new_complex = Complex(
-            complex_accession=complex_accession,
-            complex_type=complex_type,
-            composition_key=composition_key,
-            is_active=is_active,
-            is_exp_tested=is_exp_tested,
-
-        )
-
-        new_complex.proteins = [
-            ProteinComplex(prot_id=prot_id)
-            for prot_id in protein_ids
-        ]
-
-        session.add(new_complex)
-        session.flush()  # This sends the changes to the database, so complex_id is assigned
-        logger.info(
-            "Complex %s added with accession %s",
-            new_complex.complex_id,
-            complex_accession,
-        )
-        return new_complex
-    
-    except Exception as exc:
-        logger.exception("Failed to add protein accession=%s", protacc)
-        logger.exception(exc)
-        session.rollback()
-        raise
-
-# Mapping of known databases to whether they link to CDS (True) or Protein (False)
-# CDS (genes): NCBI, NCBITAX, GO (when linked to genes)
-# Protein: Uniprot, KO (KEGG Orthology), PDB
-DATABASE_TARGETS = {
-    "NCBI": True,      # CDS
-    "NCBITAX": True,   # CDS
-    "GO": True,        # CDS
-    "Uniprot": False,  # PROTEIN
-    "KO": False,       # PROTEIN
-    "PDB": False,      # PROTEIN
-}
-
-# Function to add Xdatabase data 
-def add_xdatabase(session, xname, xurl=None, xtype=None):
+# # Function to add Xdatabase data 
+# def add_xdatabase(session, xname, href, xtype):
 
 #     ''' Args:
 #     session: SQLAlchemy session to the database
