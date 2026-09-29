@@ -402,6 +402,8 @@ class Isoforms(Base):
 
 class Complex(Base):
     """Each row describes a unique BMC-like complex.
+    Complex uniqueness is defined by its set of protein members.
+    Protein order does not affect complex identity.
 
     The table stores
 
@@ -419,21 +421,28 @@ class Complex(Base):
     complex_id: Mapped[int] = mapped_column(
         primary_key=True, autoincrement=True
     )  # Autopopulated ID for local table
+    
     complex_accession: Mapped[str] = mapped_column(nullable=False, unique=True)
+    
     complex_type: Mapped[str] = mapped_column(
         nullable=False
     )  # Classification undecided (pdu,eut,grm..)
+    
+    # Internal key used to enforce uniqueness of protein composition.
+    composition_key: Mapped[str] = mapped_column(
+        nullable=False,
+        unique=True,
+    )  # Unique key for complex composition (ensure complex uniqueness)
+    
+    
     is_active: Mapped[Optional[bool]] = mapped_column(nullable=True)  # Active/Inactive.
     is_exp_tested: Mapped[Optional[bool]] = mapped_column(nullable=True)  # Y/N.
     #    complex_source = Column(SQLEnum(ComplexSource, name="complex_source_enum"), nullable=False)  # Not currently defined
 
     # Introduce all relationship between tables:
-    proteins: Mapped["ProteinComplex"] = relationship(
+    # Introduced list as protein_complex to complex is a one to many collections.
+    proteins: Mapped[list["ProteinComplex"]] = relationship(
         "ProteinComplex",
-        back_populates="complex",
-    )
-    interactions: Mapped["Ppi_complex"] = relationship(
-        "Ppi_complex",
         back_populates="complex",
     )
 
@@ -448,7 +457,9 @@ class ProteinComplex(Base):
     - whether the protein is essential for the complex assembly,
     - copy number of the protein in the complex.
     """
-
+    
+    """Issue about UNIQUENESS OF COMPLEX, how to work on this definition top priority"""
+    
     __tablename__ = "protein_complex"
     __table_args__ = (PrimaryKeyConstraint("prot_id", "complex_id"),)
 
@@ -463,7 +474,7 @@ class ProteinComplex(Base):
     is_essential: Mapped[Optional[bool]] = mapped_column(
         default=False, nullable=True
     )  # Whether the protein is essential for the complex assembly
-    stoichiometry: Mapped[Optional[int]] = mapped_column(
+    stoichiometry: Mapped[Optional[str]] = mapped_column(
         nullable=True
     )  # Copy number of the protein in the complex
 
@@ -472,55 +483,37 @@ class ProteinComplex(Base):
     protein: Mapped["Protein"] = relationship(back_populates="complexes")
 
 
-class Interaction(Base):
-    """Each row describes a unique protein-protein interaction.
-
-    The table stores
-
-    - interaction ID,
-    - interaction type,
-    - interaction description.
-    """
-
-    __tablename__ = "interaction"
-    __table_args__ = (UniqueConstraint("interact_type", "interact_description"),)
-
-    # Define table content in declarative:
-    interact_id: Mapped[int] = mapped_column(
-        primary_key=True, autoincrement=True
-    )  # Autopopulated ID for local table
-    interact_type: Mapped[str] = mapped_column(
-        nullable=False
-    )  # Type of interaction (e.g: electrostatic, hydrophobic, etc)
-
-    interact_description: Mapped[str] = mapped_column(
-        nullable=True
-    )  # Description of the interaction
-
-    # Introduce all relationship between tables:
-    ppis: Mapped["Ppi"] = relationship(back_populates="interaction")
-
 
 class Ppi(Base):
     """Each row describes a unique protein-protein interaction between two  specific proteins.
 
     The table stores
 
-    - ppiID (to assign a unique identifier to each interaction),
-    - interaction ID,
+    - ppi_ID (to assign a unique identifier to each interaction),
+    - interaction status (lock vocabulary, ENUM)
+    - interaction type,
+    - interaction_description,
     - protein ID 1,
     - protein ID 2.
     """
 
     __tablename__ = "Ppi"
-
+    __table_args__ = (UniqueConstraint("prot_id_1", "prot_id_2"),)
+    
     # Define table content:
     ppi_id: Mapped[int] = mapped_column(
         primary_key=True, unique=True, autoincrement=True
     )
-    interact_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("interaction.interact_id"),
-    )
+    interact_status: Mapped[Optional[Enum]] =  Column(Enum(InteractStatus), nullable=False)  # Interaction status (lock vocabulary, ENUM)
+    
+    interact_type: Mapped[str] = mapped_column(
+        nullable=True
+    )  # Type of interaction (e.g: electrostatic, hydrophobic, etc)
+    
+    interact_description: Mapped[str] = mapped_column(
+        nullable=True
+    )  # Description of the interaction
+    
     prot_id_1: Mapped[int] = mapped_column(
         ForeignKey("protein.prot_id"),
     )
@@ -536,32 +529,6 @@ class Ppi(Base):
     protein_2: Mapped["Protein"] = relationship(
         "Protein", back_populates="interaction_2", foreign_keys=[prot_id_2]
     )
-    interaction: Mapped["Interaction"] = relationship(back_populates="ppis")
-
-
-class Ppi_complex(Base):
-    """Each row describes a unique protein-protein interaction associated to a complex.
-
-    The table stores
-
-    - ppiID,
-    - complex ID.
-    """
-
-    __tablename__ = "ppi_complex"
-    __table_args__ = (PrimaryKeyConstraint("ppi_id", "complex_id"),)
-
-    # Define table content:
-    ppi_id: Mapped[int] = mapped_column(
-        ForeignKey("Ppi.ppi_id"),
-    )
-    complex_id: Mapped[int] = mapped_column(
-        ForeignKey("complex.complex_id"),
-    )
-
-    # Introduce all relationship between tables:
-    ppi: Mapped["Ppi"] = relationship(back_populates="complex")
-    complex: Mapped["Complex"] = relationship(back_populates="interactions")
 
 
 """ Functions to add data to the database"""
@@ -639,6 +606,76 @@ def add_protein(session, protseq, struct, canonical):
         session.rollback()
         raise
 
+# Make composition key so we can sort complex and then ensure uniqueness of complex composition. This is a helper function for add_complex.
+def make_composition_key(protein_ids: list[int]) -> str:
+    """Create an order-independent key for a complex composition."""
+
+    if not protein_ids:
+        raise ValueError(
+            "A complex must contain at least one protein."
+        )
+
+    if len(protein_ids) != len(set(protein_ids)):
+        raise ValueError(
+            "The same protein cannot be listed more than once "
+            "in a complex."
+        )
+
+    sorted_ids = sorted(protein_ids)
+
+    return "-".join(str(prot_id) for prot_id in sorted_ids)
+
+# Function to add complex (MUST BE TESTED)
+def add_complex(
+    session,
+    complex_accession: str,
+    complex_type: str,
+    protein_ids: list[int],
+    is_active: Optional[bool] = None,
+    is_exp_tested: Optional[bool] = None,
+):
+    composition_key = make_composition_key(protein_ids)
+
+    existing_complex = session.scalar(
+        select(Complex).where(
+            Complex.composition_key == composition_key
+        )
+    )
+    try:
+        if existing_complex is not None:
+            raise ValueError(
+                f"This protein combination already exists as "
+                f"complex {existing_complex.complex_accession}."
+            )
+
+        new_complex = Complex(
+            complex_accession=complex_accession,
+            complex_type=complex_type,
+            composition_key=composition_key,
+            is_active=is_active,
+            is_exp_tested=is_exp_tested,
+
+        )
+
+        new_complex.proteins = [
+            ProteinComplex(prot_id=prot_id)
+            for prot_id in protein_ids
+        ]
+
+        session.add(new_complex)
+        session.flush()  # This sends the changes to the database, so complex_id is assigned
+        logger.info(
+            "Complex %s added with accession %s",
+            new_complex.complex_id,
+            complex_accession,
+        )
+        return new_complex
+    
+    except Exception as exc:
+        logger.exception("Failed to add protein accession=%s", protacc)
+        logger.exception(exc)
+        session.rollback()
+        raise
 
 # Mapping of known databases to whether they link to CDS (True) or Protein (False)
 # CDS (genes): NCBI, NCBITAX, GO (when linked to genes)
