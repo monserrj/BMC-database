@@ -21,7 +21,25 @@ There is an ER diagram of the current design at the link below:
 
 ## INSTALLATION INSTRUCTIONS
 
-To be added when database is further developed
+Python environment (Miniforge / conda-forge)
+
+This repository uses a Python 3.11 environment with dependencies from the community-maintained conda-forge channel.
+
+Create the environment:
+
+conda env create -f conda_envs/BMC_database_313_forge.yml
+
+Activate the environment:
+
+conda activate BMC_database_313_forge
+
+Environment migration (October 2026)
+
+The original Windows and macOS Anaconda environment specifications were replaced with a conda-forge-only configuration.
+
+The replacement environment uses updated scientific and SQL-related dependencies and is not an exact reproduction of the original environments.
+
+The historical specifications remain accessible through Git history.
 
 ## USAGE INSTRUCTIONS
 
